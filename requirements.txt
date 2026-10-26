@@ -1,0 +1,12 @@
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+openpyxl==3.1.5
+xlrd==2.0.2
+python-barcode==0.16.1
+pillow==13.0.0
+fonttools==4.67.0
+httpx==0.28.1
+keyring==25.7.0
+pytest==9.1.1
+pywin32==311; sys_platform == 'win32'
