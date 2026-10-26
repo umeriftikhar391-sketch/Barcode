@@ -10,8 +10,8 @@ exit /b %BARCODE_RESULT%
 # BARCODE_POWERSHELL_BEGIN
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/669527f1341d91bca7e6de6a35bd55538e7d97d7/downloads/Barcode-Studio.zip'
-$packageHash = 'b166833101ce91466ed2d46c58130e43f9148a68f3d6a0dff224baa76238464c'
+$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/f9e06721418e63500144a0a6a9c5c0a8aa5a2953/downloads/Barcode-Studio.zip'
+$packageHash = 'f62ff3dcc6db1711fc0e45567c75cc7f3f38e9b7ef3c18f23730f113530452ca'
 $base = Join-Path $env:LOCALAPPDATA 'BarcodeStudio'
 $runtime = Join-Path $base 'Runtime\Python312'
 $appDir = Join-Path $base ('versions\' + $packageHash.Substring(0, 16))
