@@ -1,4 +1,6 @@
-# One-file setup for a new Windows PC
+# App-only setup and matched-printer deployment
+
+For the final reusable setup **including your working TSC driver and tested media settings**, use [MATCHED-PC-SETUP.md](MATCHED-PC-SETUP.md). The following describes the ordinary app-only download when no captured PrinterBundle is provided. It cannot claim to install a driver without that bundle.
 
 Download **Barcode-One-Click-Setup.zip** from this project's GitHub `downloads` folder. Right-click the ZIP, choose **Extract All**, then double-click **Setup-Barcode-Studio.cmd**. Keep the setup window open until it finishes. Run it as your ordinary Windows user, not as Administrator.
 
@@ -16,7 +18,7 @@ You need Windows 10/11 **x64**, Internet during setup, and permission to downloa
 
 After setup, the **Barcode Studio desktop shortcut** opens the application. Manual products, spreadsheet imports, saved queues and preview work without Internet. Odoo naturally requires Internet and separate authorized credentials.
 
-Repeated runs of the same setup verify the existing version and recreate the shortcut; a partially installed known package can resume dependency installation. Unknown existing folders are not overwritten. Different packaged versions use different folders. Queue/history/calibration data stay in `%LOCALAPPDATA%\BarcodeStudio\state.sqlite`, outside version folders. This setup does not move settings or Odoo credentials from a different PC. Calibration must be repeated for that PC/printer configuration. No existing Python is removed, no printer driver is installed, and no Odoo credentials are requested or stored by setup.
+Repeated runs of the same setup verify the existing version and recreate the shortcut; a partially installed known package can resume dependency installation. Unknown existing folders are not overwritten. Different packaged versions use different folders. Queue/history/calibration data stay in `%LOCALAPPDATA%\BarcodeStudio\state.sqlite`, outside version folders. This setup does not move settings or Odoo credentials from a different PC. Calibration must be repeated for that PC/printer configuration. No existing Python is removed, no printer driver is installed by the app-only path, and no Odoo credentials are requested or stored by setup. The confirmed 107 mm / 33 x 24 mm / 2 mm profile is seeded for new workspaces; existing media settings are preserved.
 
 If setup stops, leave its window open and read the message. Logs are in `%LOCALAPPDATA%\BarcodeStudio\setup-YYYYMMDD-HHMMSS.log`. Do not send credentials in screenshots or logs. Fix the reported network/permission problem, then rerun the same setup. Do not assume it finished if checks failed. A rare installer exit code requesting a restart may require Windows to restart before a retry.
 

@@ -4,9 +4,13 @@ Local Windows-compatible three-column label application for TSC TE200. React/Typ
 
 **This is software-tested development code, not a production-certified printer release.** Your stated media dimensions total **113 mm**, exceeding the **107 mm backing** and **108 mm printable width**. Defaults are preserved. Production remains locked until corrected measured geometry and actual hardware calibration are recorded. A preview is not proof that a barcode will scan.
 
-## Automatic setup on a new Windows PC
+## Final setup including the working TSC driver
 
-Download [Barcode-One-Click-Setup.zip](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Barcode-One-Click-Setup.zip), extract it and double-click **Setup-Barcode-Studio.cmd**. It finds/installs verified Python, downloads and verifies the application, installs dependencies, creates a desktop shortcut, and opens the app. No Node.js or typed commands are needed. Internet is required for first installation. See [new-PC setup details](docs/NEW-PC-SETUP.md) for scope and logs. The new installer still needs fresh-Windows end-to-end verification; it is not a signed MSI/EXE.
+On the PC where the TE200 now prints correctly, download [Prepare-Full-PC-Setup.zip](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Prepare-Full-PC-Setup.zip), extract it and run **Prepare-Full-PC-Setup.cmd**. It creates **Barcode-Full-PC-Setup-<date-time>.zip** on your Desktop with the installed signed TSC driver and exact tested printer/media preferences.
+
+Copy that single ZIP to a new Windows x64 PC, extract the entire ZIP, connect/power on the TE200, and run **Setup-Barcode-Studio.cmd**. It installs/reuses Python, downloads the verified app/dependencies, installs the captured driver with Windows approval, restores the printer settings, seeds the 107 mm / 33 x 24 mm / 2 mm media profile, and creates the desktop shortcut. No dimensions or setup commands need typing. The physical verification checklist is still required on the new PC; an installer cannot certify sensor calibration or printed alignment. See [matched-PC setup instructions and verification limits](docs/MATCHED-PC-SETUP.md).
+
+The [ordinary app-only setup](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Barcode-One-Click-Setup.zip) is also available. Without a captured PrinterBundle, it installs the app/Python and confirmed media profile but does not claim the driver was installed. No unverified driver URL or installer is used. Internet and Windows administrator approval for driver actions are required. Native deployment still needs real Windows verification.
 
 ## Install on Windows 10/11 x64
 

@@ -21,6 +21,7 @@ EXCLUDED = {
     "__pycache__",
     "build",
     "downloads",
+    "PrinterBundle",
 }
 
 
@@ -70,10 +71,16 @@ def build(root=ROOT, ref="main"):
     rendered = template.replace("__PACKAGE_URL__", url).replace(
         "__PACKAGE_SHA256__", digest
     )
+    rendered = rendered.replace("__SETUP_MODE__", "install")
     contents = rendered.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
     (root / "Setup-Barcode-Studio.cmd").write_bytes(contents)
     with zipfile.ZipFile(downloads / "Barcode-One-Click-Setup.zip", "w") as archive:
         add_bytes(archive, "Setup-Barcode-Studio.cmd", contents)
+    prepare = contents.replace(
+        b'set "BARCODE_SETUP_MODE=install"', b'set "BARCODE_SETUP_MODE=prepare"', 1
+    )
+    with zipfile.ZipFile(downloads / "Prepare-Full-PC-Setup.zip", "w") as archive:
+        add_bytes(archive, "Prepare-Full-PC-Setup.cmd", prepare)
     return digest
 
 

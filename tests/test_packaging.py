@@ -26,6 +26,8 @@ def project(tmp_path):
     (tmp_path / ".env").write_text("SECRET=not-for-distribution")
     (tmp_path / ".env.production").write_text("SECRET=not-for-distribution")
     (tmp_path / ".env.example").write_text("ODOO_API_KEY=")
+    (tmp_path / "PrinterBundle").mkdir()
+    (tmp_path / "PrinterBundle/devmode.bin").write_bytes(b"private driver profile")
     return tmp_path
 
 
@@ -45,6 +47,7 @@ def test_packages_pin_verified_app_and_exclude_local_state(project):
             or "/.venv/" in n
             or n.endswith("/.env")
             or ".env.production" in n
+            or "/PrinterBundle/" in n
             for n in names
         )
         assert not any(
@@ -58,6 +61,13 @@ def test_packages_pin_verified_app_and_exclude_local_state(project):
         assert f"/{ref}/downloads/Barcode-Studio.zip".encode() in contents
         assert b"__PACKAGE_" not in contents
         assert contents.startswith(b"@echo off\r\n")
+        assert b"BARCODE_SETUP_MODE=install" in contents
+    with zipfile.ZipFile(project / "downloads/Prepare-Full-PC-Setup.zip") as prepare:
+        assert prepare.namelist() == ["Prepare-Full-PC-Setup.cmd"]
+        creator = prepare.read("Prepare-Full-PC-Setup.cmd")
+        assert b"BARCODE_SETUP_MODE=prepare" in creator
+        assert digest.encode() in creator
+        assert b"__SETUP_MODE__" not in creator
 
 
 def test_rebuild_is_deterministic_and_ref_change_does_not_mutate_app(project):

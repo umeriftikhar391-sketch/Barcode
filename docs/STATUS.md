@@ -64,3 +64,14 @@ Validation: three packaging tests passed (deterministic archive generation, cred
 The final user drawing resolves geometry to 107 mm backing, three 33 x 24 mm labels, 2 mm inter-label/side gaps and 2 mm internal safe margins. Software raster/geometry validation passes for this configuration; physical acceptance is still pending. Driver screenshots subsequently showed 4.21 x 0.94 in stock with 0.08 in exposed liner on both sides and repeated generic failures. Those are possible preflight causes, not proven live device-cap readings. See docs/PRINTER.md for exact dimensions and full-row driver liner settings.
 
 Updated native preflight to report actual DPI, printable page size and offsets, surface safe configuration errors in the UI/history, and release the Windows print context on preflight failures. Unknown exceptions and possible partial submission remain uncertain, with no automatic retry. Tests cover short driver pages, added offsets, DPI mismatches, and safe error propagation. No Windows print or successful physical calibration is claimed.
+
+
+## Matched-PC deployment update
+
+The user reported successful GDI calibration printing on the working Windows PC, including prices, seven-label counts and scanner readings, and a correct repeat job. This supports that specific tested printer/profile; it is not a Windows deployment test.
+
+Added a setup creator that exports the installed signed TSC TE200 OEM driver and exact per-user DEVMODE/custom form, packages them privately with the pinned bootstrap, and restores them on a new USB-connected Windows x64 PC using PnPUtil, exact driver-version checks and native preference/page validation. New workspaces receive the confirmed 107 mm backing / 33 x 24 mm stickers / 2 mm gaps, side margins and internal safe margins. The destination's physical calibration confirmation is cleared rather than copied. Queues, Odoo credentials and print history are not exported.
+
+This completes the independent packaging/validation code. Actual Windows driver migration/UAC/PnP/private-profile behavior remains unverified. Official driver websites remain inaccessible via current network policy; the implementation reuses the user's working signed package instead of inventing an unattended driver download. Device sensor calibration and physical output checks cannot be automated into a truthful success claim. See docs/MATCHED-PC-SETUP.md.
+
+Deployment validation executed: `pytest -q tests/test_provisioning.py tests/test_packaging.py` — 13 passed; fatal/syntax lint and Python compilation passed. Both generated CMD files' embedded PowerShell parsed successfully with PowerShell 7.5.4 on Linux. ZIP integrity, included built frontend/helper, immutable-download/checksum bindings and private PrinterBundle exclusions were checked. Native Windows execution, signed-catalog verification, driver export/import and hardware behavior were not executed here.
