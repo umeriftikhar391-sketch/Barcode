@@ -52,3 +52,9 @@ Saved `install_script` and `start_skill` to the environment draft. These reprodu
 ## Project files
 
 `backend/`: models, pure layout, rendering, importer, Odoo client, printer adapters and local API/persistence/security. `frontend/src/`: real React workflow and API client. `tests/`: 50 tests and actual XLSX/generated XLS fixtures. `samples/`: CSV and Excel templates. `scripts/`: cloud setup, Windows-compatible launcher and browser smoke. Root PowerShell/CMD/spec files: Windows installation and packaging. `docs/`: architecture, attachment evidence, Odoo guide, printer procedures and this report.
+
+## New-PC installer addendum
+
+Added a single hybrid CMD/PowerShell setup download: automatic compatible-Python discovery, official signed Python installation when needed, immutable GitHub package download with embedded SHA256 verification, per-version app environment, dependency/import/render checks, resumable known installs, log file, desktop shortcut and app launch. It neither changes execution policy nor installs unverified printer drivers. See docs/NEW-PC-SETUP.md.
+
+Validation: three packaging tests passed (deterministic archive generation, credential/state exclusions, embedded built frontend, immutable download ref and matching package checksum, invalid/missing build rejection). The embedded PowerShell parsed successfully with the official PowerShell 7.5.4 Linux runtime after verifying its published release checksum; mutex construction also executed successfully. These checks do not establish Windows PowerShell 5.1/CMD compatibility or fresh-Windows installation success. Python installer signature verification, native installation, desktop shortcut and full fresh-PC flow remain Windows-dependent and unverified here.

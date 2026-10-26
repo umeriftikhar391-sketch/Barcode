@@ -4,6 +4,10 @@ Local Windows-compatible three-column label application for TSC TE200. React/Typ
 
 **This is software-tested development code, not a production-certified printer release.** Your stated media dimensions total **113 mm**, exceeding the **107 mm backing** and **108 mm printable width**. Defaults are preserved. Production remains locked until corrected measured geometry and actual hardware calibration are recorded. A preview is not proof that a barcode will scan.
 
+## Automatic setup on a new Windows PC
+
+Download [Barcode-One-Click-Setup.zip](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Barcode-One-Click-Setup.zip), extract it and double-click **Setup-Barcode-Studio.cmd**. It finds/installs verified Python, downloads and verifies the application, installs dependencies, creates a desktop shortcut, and opens the app. No Node.js or typed commands are needed. Internet is required for first installation. See [new-PC setup details](docs/NEW-PC-SETUP.md) for scope and logs. The new installer still needs fresh-Windows end-to-end verification; it is not a signed MSI/EXE.
+
 ## Install on Windows 10/11 x64
 
 1. Download this project to a normal folder. Install official Python **3.12 x64** (include the Python launcher), and Node.js **22 LTS or newer** from their official publishers. Internet is required for first installation.
