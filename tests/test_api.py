@@ -158,3 +158,26 @@ def test_odoo_remote_errors_are_redacted(monkeypatch, status):
     with pytest.raises(ValueError, match=str(status)) as exc:
         odoo.products("")
     assert "sensitive" not in str(exc.value)
+
+
+def test_known_driver_preflight_error_is_visible(client, monkeypatch):
+    q = Queue(products=[product()], geometry=valid())
+    module.put_setting("calibration", module.fingerprint(q.geometry, "TSC", "driver"))
+
+    def blocked(*args):
+        raise module.printers.PrinterPreflightError(
+            "Driver page is 191 dots high; enter exact 24 mm height."
+        )
+
+    monkeypatch.setattr(module.printers, "submit", blocked)
+    r = client.post(
+        "/api/print",
+        json={
+            "id": "preflight-job",
+            "queue": q.model_dump(mode="json"),
+            "printer": "TSC",
+        },
+    ).json()
+    assert r["status"].startswith("Blocked before submission")
+    assert "24 mm" in r["detail"]
+    assert r["spool_id"] is None

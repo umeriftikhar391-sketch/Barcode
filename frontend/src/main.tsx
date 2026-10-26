@@ -1190,7 +1190,7 @@ function App() {
                       command_reference_verified:
                         checks.command_reference_verified || false,
                     });
-                    setNotice(r.status);
+                    setNotice([r.status, r.detail].filter(Boolean).join(": "));
                     setJobs(await api("jobs"));
                   })
                 }
@@ -1273,7 +1273,7 @@ function App() {
                       printer,
                       mode,
                     });
-                    setNotice(r.status);
+                    setNotice([r.status, r.detail].filter(Boolean).join(": "));
                     setJobs(await api("jobs"));
                   })
                 }
@@ -1319,7 +1319,9 @@ function App() {
                             "jobs/" + j.id + "/cancel",
                             "POST",
                           );
-                          setNotice(r.status);
+                          setNotice(
+                            [r.status, r.detail].filter(Boolean).join(": "),
+                          );
                           setJobs(await api("jobs"));
                         })
                       }

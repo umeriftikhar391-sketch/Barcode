@@ -16,3 +16,13 @@
 Troubleshooting: wandering columns suggest guide tension or incorrect die-cut pitch; progressive vertical drift suggests sensor/media-gap settings; pale/dense bars suggest media/ribbon or density/speed; clipped text indicates unsafe geometry or driver margins; wrong row origin indicates driver page pitch or feed calibration. Stop production, resolve the cause, and repeat physical acceptance. Do not compensate by shrinking barcode modules below the minimum.
 
 Windows 10/11, GDI driver behavior, TSPL polarity/feeding, actual USB communication, scanner readability and printer faults are hardware-dependent and remain untested here.
+
+## Confirmed revised roll and GDI stock settings
+
+The user's latest dimension drawing supersedes earlier values: backing 107 mm, three labels each 33 x 24 mm, 2 mm horizontal/vertical gaps, 2 mm left/right margins. Retain the separately requested 2 mm internal safe inset. Horizontal total is 107 mm; row pitch is 26 mm. Start app print offsets/origin at zero, then calibrate physically.
+
+For this application's full-row GDI raster, create one driver stock page of **107 mm wide x 24 mm high**, Die-Cut, Portrait. Enter exact measurements, not an approximation of 0.94 inches for height: that is only 23.876 mm and may result in a driver page one dot shorter than the renderer requires. If the fields accept explicit units, type `107 mm` and `24 mm`; otherwise use 4.2126 in and 0.9449 in. A rounded display alone does not prove the internally stored value was rounded.
+
+Set the driver's **Exposed Liner Widths Left/Right to zero** for the full-row raster. The application's two side margins remain 2 mm; adding driver liner offsets double-applies placement and may introduce hardware margins that the strict GDI preflight refuses. Save/select the stock and Apply/OK all preferences before the app creates a new print context. Set the vertical gap/sensor options separately according to the driver controls and TSC manual. Inspect the Windows queue and any physical output before sending another approved calibration sample.
+
+Known preflight failures now display the actual driver DPI, printable dot dimensions and offsets, with corrective instructions. These are distinguished from an uncertain failure after submission may have begun. Driver behavior remains Windows/hardware-dependent; a screenshot alone cannot establish the exact reported device capabilities or whether the stock dimensions were stored precisely.

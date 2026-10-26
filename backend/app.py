@@ -272,6 +272,10 @@ def dispatch(p):
             job = printers.submit(p.queue, p.printer, p.mode)
             status = "Accepted by Spooler — Physical Confirmation Pending"
             detail = ""
+        except printers.PrinterPreflightError as exc:
+            job = None
+            status = "Blocked before submission — driver settings need correction"
+            detail = str(exc)
         except Exception:
             job = None
             status = "Failed or uncertain — inspect printer before retry"

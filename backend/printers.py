@@ -3,6 +3,33 @@ from .render import raster_row, tspl
 from .layout import rows
 
 
+class PrinterPreflightError(ValueError):
+    """A known configuration problem detected before submitting any document."""
+
+
+def driver_preflight(g, caps, images):
+    issues = []
+    if (caps["dpi_x"], caps["dpi_y"]) != (g.dpi, g.dpi):
+        issues.append(
+            f"Driver resolution is {caps['dpi_x']} x {caps['dpi_y']} DPI; select 203 DPI. Automatic scaling is disabled."
+        )
+    if any(
+        im.width > caps["page_width"] or im.height > caps["page_height"]
+        for im in images
+    ):
+        needed_w = max(im.width for im in images)
+        needed_h = max(im.height for im in images)
+        issues.append(
+            f"Driver printable page is {caps['page_width']} x {caps['page_height']} dots; this row requires {needed_w} x {needed_h}. Enter exact stock width {g.backing:g} mm and label height {g.height:g} mm (avoid rounded inch values), select that stock and Apply settings."
+        )
+    if caps["offset_x"] or caps["offset_y"]:
+        issues.append(
+            f"Driver adds offsets of {caps['offset_x']} horizontal and {caps['offset_y']} vertical dots. Set driver Exposed Liner Widths Left/Right to 0 and driver print offsets to 0. Keep the physical side margins in the app; its raster already includes them."
+        )
+    if issues:
+        raise PrinterPreflightError(" ".join(issues))
+
+
 def discover():
     if os.name != "nt":
         return []
@@ -13,13 +40,13 @@ def discover():
 
 def submit(queue, printer, mode):
     if os.name != "nt":
-        raise ValueError(
+        raise PrinterPreflightError(
             "Physical printing requires Windows and the installed TSC driver"
         )
     if printer not in [p["name"] for p in discover()]:
-        raise ValueError("Selected printer is unavailable")
+        raise PrinterPreflightError("Selected printer is unavailable")
     if not ("TSC" in printer.upper() or "TE200" in printer.upper()):
-        raise ValueError(
+        raise PrinterPreflightError(
             "Select a TSC label printer; Epson receipt printers are not supported"
         )
     import win32print
@@ -43,39 +70,27 @@ def submit(queue, printer, mode):
         finally:
             win32print.ClosePrinter(handle)
     if mode != "driver":
-        raise ValueError("Choose driver or raw printing")
+        raise PrinterPreflightError("Choose driver or raw printing")
     import win32ui, win32con
     from PIL import ImageWin
 
     dc = win32ui.CreateDC()
-    dc.CreatePrinterDC(printer)
-    g = queue.geometry
-    # Refuse driver scaling or printable areas that cannot preserve native dots.
-    if (
-        dc.GetDeviceCaps(win32con.LOGPIXELSX),
-        dc.GetDeviceCaps(win32con.LOGPIXELSY),
-    ) != (g.dpi, g.dpi):
-        dc.DeleteDC()
-        raise ValueError(
-            "Driver DPI must match 203 DPI; automatic scaling is forbidden"
-        )
-    page_w = dc.GetDeviceCaps(win32con.HORZRES)
-    page_h = dc.GetDeviceCaps(win32con.VERTRES)
-    physical_x = dc.GetDeviceCaps(win32con.PHYSICALOFFSETX)
-    physical_y = dc.GetDeviceCaps(win32con.PHYSICALOFFSETY)
-    images = [raster_row(r, g, True) for r in rows(queue.products)]
-    if any(im.width > page_w or im.height > page_h for im in images):
-        dc.DeleteDC()
-        raise ValueError(
-            "Driver page is too small; configure one physical row, no scaling"
-        )
-    if physical_x or physical_y:
-        dc.DeleteDC()
-        raise ValueError(
-            "Driver introduces hardware margins; configure zero-offset media before driver printing"
-        )
+    started = False
     try:
+        dc.CreatePrinterDC(printer)
+        g = queue.geometry
+        caps = {
+            "dpi_x": dc.GetDeviceCaps(win32con.LOGPIXELSX),
+            "dpi_y": dc.GetDeviceCaps(win32con.LOGPIXELSY),
+            "page_width": dc.GetDeviceCaps(win32con.HORZRES),
+            "page_height": dc.GetDeviceCaps(win32con.VERTRES),
+            "offset_x": dc.GetDeviceCaps(win32con.PHYSICALOFFSETX),
+            "offset_y": dc.GetDeviceCaps(win32con.PHYSICALOFFSETY),
+        }
+        images = [raster_row(r, g, True) for r in rows(queue.products)]
+        driver_preflight(g, caps, images)
         job = dc.StartDoc("Barcode Studio")
+        started = True
         for im in images:
             dc.StartPage()
             ImageWin.Dib(im.convert("RGB")).draw(
@@ -83,9 +98,14 @@ def submit(queue, printer, mode):
             )
             dc.EndPage()
         dc.EndDoc()
+        started = False
         return job
     except Exception:
-        dc.AbortDoc()
+        if started:
+            try:
+                dc.AbortDoc()
+            except Exception:
+                pass  # Preserve the original failure; physical outcome is uncertain.
         raise
     finally:
         dc.DeleteDC()
