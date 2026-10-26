@@ -1,5 +1,6 @@
 @echo off
 setlocal
+set "BARCODE_SETUP_MODE=install"
 set "BARCODE_SETUP_FILE=%~f0"
 powershell.exe -NoLogo -NoProfile -Command "$text = [IO.File]::ReadAllText($env:BARCODE_SETUP_FILE); $marker = '# BARCODE_POWERSHELL_BEGIN'; $code = $text.Substring($text.LastIndexOf($marker) + $marker.Length); & ([scriptblock]::Create($code))"
 set "BARCODE_RESULT=%ERRORLEVEL%"
@@ -10,8 +11,8 @@ exit /b %BARCODE_RESULT%
 # BARCODE_POWERSHELL_BEGIN
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/f9e06721418e63500144a0a6a9c5c0a8aa5a2953/downloads/Barcode-Studio.zip'
-$packageHash = 'f62ff3dcc6db1711fc0e45567c75cc7f3f38e9b7ef3c18f23730f113530452ca'
+$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/7c4971cead7ea6d8e3a1ed0ea4c0459f1d44dc6b/downloads/Barcode-Studio.zip'
+$packageHash = 'eaa193832b67d55f934cb69a4750cbdea97feaa23451ef39be0f3c85bfb5dfaa'
 $base = Join-Path $env:LOCALAPPDATA 'BarcodeStudio'
 $runtime = Join-Path $base 'Runtime\Python312'
 $appDir = Join-Path $base ('versions\' + $packageHash.Substring(0, 16))
@@ -72,7 +73,7 @@ try {
     $transcript = $true
     Write-Host 'BARCODE STUDIO - NEW PC SETUP' -ForegroundColor Cyan
     Write-Host 'Installs the app for your Windows account. Internet is needed once.'
-    Write-Host 'No administrator window, Node.js, or PowerShell policy change is required.'
+    Write-Host 'No Node.js or typed setup commands are needed. Driver capture/installation requests Windows administrator approval.'
     Write-Host ('Log: ' + $log)
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $work = Join-Path ([IO.Path]::GetTempPath()) ('BarcodeSetup-' + [guid]::NewGuid().ToString('N'))
@@ -144,14 +145,46 @@ try {
     $shortcut.WorkingDirectory = $appDir
     $shortcut.Description = 'Open Barcode Studio local label workspace'
     $shortcut.Save()
-    Write-Host ''
-    Write-Host 'INSTALLATION COMPLETE' -ForegroundColor Green
-    Write-Host 'Use the Barcode Studio desktop shortcut next time.'
-    Write-Host 'Keep its console window open while using the application.'
-    Write-Host 'Printer drivers, Odoo credentials and physical calibration require separate setup.'
-    Write-Host 'Production printing stays locked until measured geometry and calibration are confirmed.'
-    Write-Host ('Application folder: ' + $appDir)
-    Start-Process -FilePath (Join-Path $appDir 'Start-Barcode.cmd') -WorkingDirectory $appDir
+    $bundle = Join-Path ([IO.Path]::GetDirectoryName($env:BARCODE_SETUP_FILE)) 'PrinterBundle'
+    if ($env:BARCODE_SETUP_MODE -eq 'prepare') {
+        $output = Join-Path $shell.SpecialFolders.Item('Desktop') ('Barcode-Full-PC-Setup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip')
+        Write-Host 'Capturing the working TE200 driver and exact printer preferences. Approve the Windows driver-export prompt.'
+        Push-Location -LiteralPath $appDir
+        try {
+            & $venv -m scripts.provision_printer prepare --setup $env:BARCODE_SETUP_FILE --output $output
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the matched-PC setup. Read the printer export error above. Your current printer settings were not changed.' }
+        } finally { Pop-Location }
+        Write-Host 'FULL NEW-PC SETUP CREATED' -ForegroundColor Green
+        Write-Host ('Copy this single ZIP to each new Windows x64 PC: ' + $output)
+        Write-Host 'Extract it, connect/power on the TE200, and double-click Setup-Barcode-Studio.cmd. Keep PrinterBundle beside that CMD.'
+        Write-Host 'The ZIP contains the signed driver and tested media settings. Physical calibration confirmation must be completed on each PC.'
+        Start-Process explorer.exe -ArgumentList ('/select,"{0}"' -f $output)
+    } else {
+        Push-Location -LiteralPath $appDir
+        try {
+            if (Test-Path -LiteralPath $bundle) {
+                Write-Host 'Installing the captured signed driver and restoring the tested media settings. Keep the TE200 powered on and connected by USB.'
+                & $venv -m scripts.provision_printer restore --folder $bundle
+                if ($LASTEXITCODE -ne 0) { throw 'App installed, but printer setup is incomplete. Read the specific error above, resolve it and rerun this setup. Production remains locked.' }
+            } else {
+                & $venv -m scripts.provision_printer initialize
+                if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the confirmed roll geometry.' }
+                Write-Host 'This download has no captured PrinterBundle. For automatic driver/profile setup, create the full ZIP on your working PC using Prepare-Full-PC-Setup.cmd.' -ForegroundColor Yellow
+            }
+        } finally { Pop-Location }
+        Write-Host ''
+        Write-Host 'SOFTWARE INSTALLATION COMPLETE' -ForegroundColor Green
+        Write-Host 'Use the Barcode Studio desktop shortcut next time. Keep its console window open while using it.'
+        Write-Host 'Confirmed roll: 107 mm, three 33 x 24 mm stickers, 2 mm gaps/margins, 2 mm internal safe margins.'
+        Write-Host 'A short physical verification is required on this PC before production printing unlocks. Odoo credentials are not transferred.'
+        Write-Host ('Application folder: ' + $appDir)
+        $listener = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue
+        if ($listener) {
+            Write-Host 'An app is already using port 8765. Close the old Barcode Studio console, then open the new desktop shortcut.' -ForegroundColor Yellow
+        } else {
+            Start-Process -FilePath (Join-Path $appDir 'Start-Barcode.cmd') -WorkingDirectory $appDir
+        }
+    }
     $resultCode = 0
 } catch {
     Write-Host ''
