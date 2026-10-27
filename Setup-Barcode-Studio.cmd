@@ -11,8 +11,11 @@ exit /b %BARCODE_RESULT%
 # BARCODE_POWERSHELL_BEGIN
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/7c4971cead7ea6d8e3a1ed0ea4c0459f1d44dc6b/downloads/Barcode-Studio.zip'
-$packageHash = 'eaa193832b67d55f934cb69a4750cbdea97feaa23451ef39be0f3c85bfb5dfaa'
+$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/6066dc0c2173f7d21d8fbfad19f094bfb3f5f780/downloads/Barcode-Studio.zip'
+$packageHash = '3d676e530aa38ef82142a0b2ff5c4d277362778c80ea02a5348da1b7cf567fcd'
+$offlineManifestHash = ''
+$offlineMode = $env:BARCODE_SETUP_MODE -eq 'install-offline'
+$offlineRoot = Join-Path ([IO.Path]::GetDirectoryName($env:BARCODE_SETUP_FILE)) 'OfflinePayload'
 $base = Join-Path $env:LOCALAPPDATA 'BarcodeStudio'
 $runtime = Join-Path $base 'Runtime\Python312'
 $appDir = Join-Path $base ('versions\' + $packageHash.Substring(0, 16))
@@ -47,12 +50,58 @@ function Get-CompatiblePython {
     return $null
 }
 
+function Assert-OfflinePayload {
+    if ($offlineManifestHash -notmatch '^[a-f0-9]{64}$') { throw 'Offline manifest checksum is missing. Setup cannot continue.' }
+    $manifestPath = Join-Path $offlineRoot 'manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'OfflinePayload is missing. Extract the entire offline ZIP before running setup. No downloads will be attempted.' }
+    if ((Get-Item -LiteralPath $manifestPath).Length -gt 200000) { throw 'Offline manifest is too large.' }
+    if ((Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash -ne $offlineManifestHash) { throw 'Offline manifest checksum mismatch.' }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.schema -ne 1 -or $manifest.platform -ne 'win_amd64' -or $manifest.python -ne '3.12') { throw 'Unsupported offline payload.' }
+    $files = @($manifest.files.PSObject.Properties)
+    if ($files.Count -lt 4 -or $files.Count -gt 1000) { throw 'Invalid offline file list.' }
+    $expected = @('manifest.json')
+    $total = 0L
+    foreach ($entry in $files) {
+        $name = $entry.Name
+        if ($name -notmatch '^(application/Barcode-Studio\.zip|python/python-3\.12\.10-amd64\.exe|requirements-offline\.txt|wheelhouse/[A-Za-z0-9_.+\-]+\.whl)$') { throw ('Invalid offline file path: ' + $name) }
+        if ($entry.Value.sha256 -notmatch '^[a-f0-9]{64}$') { throw 'Invalid offline file checksum.' }
+        $path = Join-Path $offlineRoot $name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw ('Missing offline file: ' + $name) }
+        $item = Get-Item -LiteralPath $path
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Offline payload must not contain links.' }
+        $total += $item.Length
+        if ($total -gt 2147483648 -or $item.Length -ne $entry.Value.bytes -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $entry.Value.sha256) { throw ('Offline file integrity check failed: ' + $name) }
+        $expected += $name
+    }
+    foreach ($required in @('application/Barcode-Studio.zip','python/python-3.12.10-amd64.exe','requirements-offline.txt')) {
+        if ($required -notin $expected) { throw ('Offline manifest is missing ' + $required) }
+    }
+    foreach ($item in Get-ChildItem -LiteralPath $offlineRoot -Recurse -Force) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Offline payload must not contain linked folders/files.' }
+        if (-not $item.PSIsContainer) {
+            $relative = $item.FullName.Substring($offlineRoot.Length + 1).Replace('\','/')
+            if ($relative -notin $expected) { throw ('Unlisted offline file: ' + $relative) }
+        }
+    }
+    foreach ($item in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'PIP_*' })) { Remove-Item -LiteralPath ('Env:' + $item.Name) }
+    $env:PIP_CONFIG_FILE = 'NUL'
+    $env:PIP_NO_INDEX = '1'
+    $env:PIP_NO_CACHE_DIR = '1'
+    $env:PIP_DISABLE_PIP_VERSION_CHECK = '1'
+    Write-Host 'Offline payload checksums verified. Installation will use local files only.'
+}
+
 function Download-VerifiedPackage($target) {
+    if ($offlineMode) {
+        Copy-Item -LiteralPath (Join-Path $offlineRoot 'application/Barcode-Studio.zip') -Destination $target
+    } else {
     Write-Host 'Downloading the Barcode Studio application...'
     try {
         Invoke-WebRequest -UseBasicParsing -Uri $packageUrl -OutFile $target
     } catch {
         throw 'Application download failed. Check Internet access and GitHub repository access. A private repository requires an authenticated download; this installer does not collect GitHub passwords or tokens.'
+    }
     }
     $actual = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
     if ($actual -ne $packageHash) {
@@ -72,24 +121,33 @@ try {
     Start-Transcript -LiteralPath $log | Out-Null
     $transcript = $true
     Write-Host 'BARCODE STUDIO - NEW PC SETUP' -ForegroundColor Cyan
-    Write-Host 'Installs the app for your Windows account. Internet is needed once.'
+    if ($offlineMode) { Write-Host 'Offline installation: Python, wheels, app and driver are supplied locally.' } else { Write-Host 'Installs the app for your Windows account. Internet is needed to create/download the deployment package.' }
     Write-Host 'No Node.js or typed setup commands are needed. Driver capture/installation requests Windows administrator approval.'
     Write-Host ('Log: ' + $log)
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $work = Join-Path ([IO.Path]::GetTempPath()) ('BarcodeSetup-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $work | Out-Null
 
+    if ($offlineMode) {
+        Assert-OfflinePayload
+        if (-not (Test-Path -LiteralPath (Join-Path ([IO.Path]::GetDirectoryName($env:BARCODE_SETUP_FILE)) 'PrinterBundle/profile.json'))) { throw 'Offline printer bundle is missing. Extract the entire ZIP.' }
+    }
     $python = Get-CompatiblePython
     if (-not $python) {
-        Write-Host 'Downloading Python 3.12.10 x64 from python.org...'
-        $installer = Join-Path $work 'python-3.12.10-amd64.exe'
-        Invoke-WebRequest -UseBasicParsing -Uri 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile $installer
+        if ($offlineMode) {
+            $installer = Join-Path $offlineRoot 'python/python-3.12.10-amd64.exe'
+            Write-Host 'Using the bundled full Python installer...'
+        } else {
+            Write-Host 'Downloading Python 3.12.10 x64 from python.org...'
+            $installer = Join-Path $work 'python-3.12.10-amd64.exe'
+            Invoke-WebRequest -UseBasicParsing -Uri 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile $installer
+        }
         $signature = Get-AuthenticodeSignature -LiteralPath $installer
         if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch '(?:^|,\s*)O=Python Software Foundation(?:,|$)') {
             throw 'Python installer signature/publisher could not be verified. Installation stopped; no signature checks have been disabled.'
         }
         Write-Host 'Verified Python Software Foundation signature. Installing for the current account...'
-        $arguments = @('/quiet', 'InstallAllUsers=0', 'Include_launcher=0', 'Include_test=0', 'PrependPath=0', ('TargetDir="{0}"' -f $runtime))
+        $arguments = @('/quiet', 'InstallAllUsers=0', 'Include_launcher=0', 'Include_test=0', 'Include_doc=0', 'Include_tcltk=0', 'PrependPath=0', ('TargetDir="{0}"' -f $runtime))
         $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
         if ($process.ExitCode -notin @(0, 3010)) { throw ('Python installer failed with exit code ' + $process.ExitCode) }
         $python = Get-CompatiblePython
@@ -123,8 +181,12 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Python environment creation failed.' }
         $venv = Join-Path $appDir '.venv\Scripts\python.exe'
         Write-Host 'Installing application dependencies. This may take several minutes...'
-        & $venv -m pip install --disable-pip-version-check -r (Join-Path $appDir 'requirements.txt')
-        if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Check Internet/proxy access, then rerun this setup to resume.' }
+        if ($offlineMode) {
+            & $venv -m pip install --no-index --find-links (Join-Path $offlineRoot 'wheelhouse') --require-hashes --only-binary=:all: --no-cache-dir --disable-pip-version-check -r (Join-Path $offlineRoot 'requirements-offline.txt')
+        } else {
+            & $venv -m pip install --disable-pip-version-check -r (Join-Path $appDir 'requirements.txt')
+        }
+        if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Offline setup never falls back to the Internet. Read the error above, then rerun setup after resolving it.' }
     }
 
     $venv = Join-Path $appDir '.venv\Scripts\python.exe'
@@ -146,18 +208,25 @@ try {
     $shortcut.Description = 'Open Barcode Studio local label workspace'
     $shortcut.Save()
     $bundle = Join-Path ([IO.Path]::GetDirectoryName($env:BARCODE_SETUP_FILE)) 'PrinterBundle'
-    if ($env:BARCODE_SETUP_MODE -eq 'prepare') {
-        $output = Join-Path $shell.SpecialFolders.Item('Desktop') ('Barcode-Full-PC-Setup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip')
+    if ($env:BARCODE_SETUP_MODE -in @('prepare','prepare-offline')) {
+        $prefix = 'Barcode-Full-PC-Setup-'
+        if ($env:BARCODE_SETUP_MODE -eq 'prepare-offline') { $prefix = 'Barcode-OFFLINE-PC-Setup-' }
+        $output = Join-Path $shell.SpecialFolders.Item('Desktop') ($prefix + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip')
         Write-Host 'Capturing the working TE200 driver and exact printer preferences. Approve the Windows driver-export prompt.'
         Push-Location -LiteralPath $appDir
         try {
-            & $venv -m scripts.provision_printer prepare --setup $env:BARCODE_SETUP_FILE --output $output
-            if ($LASTEXITCODE -ne 0) { throw 'Could not create the matched-PC setup. Read the printer export error above. Your current printer settings were not changed.' }
+            if ($env:BARCODE_SETUP_MODE -eq 'prepare-offline') {
+                & $venv -m scripts.offline_bundle --setup $env:BARCODE_SETUP_FILE --output $output
+            } else {
+                & $venv -m scripts.provision_printer prepare --setup $env:BARCODE_SETUP_FILE --output $output
+            }
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the deployment package. Read the download/dependency/printer export error above. Your current printer settings were not changed.' }
         } finally { Pop-Location }
         Write-Host 'FULL NEW-PC SETUP CREATED' -ForegroundColor Green
         Write-Host ('Copy this single ZIP to each new Windows x64 PC: ' + $output)
         Write-Host 'Extract it, connect/power on the TE200, and double-click Setup-Barcode-Studio.cmd. Keep PrinterBundle beside that CMD.'
         Write-Host 'The ZIP contains the signed driver and tested media settings. Physical calibration confirmation must be completed on each PC.'
+        if ($env:BARCODE_SETUP_MODE -eq 'prepare-offline') { Write-Host 'OFFLINE BUNDLE: Python installer, all dependency wheels and the application are included. Keep OfflinePayload beside the CMD; no Internet is needed on the destination PC.' -ForegroundColor Green }
         Start-Process explorer.exe -ArgumentList ('/select,"{0}"' -f $output)
     } else {
         Push-Location -LiteralPath $appDir
