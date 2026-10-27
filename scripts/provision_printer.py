@@ -171,8 +171,10 @@ def admin_action(operation, folder, printer=""):
 
     args = [
         sys.executable,
-        "-m",
-        "scripts.provision_printer",
+        "-B",
+        "-c",
+        "import runpy,sys;sys.path.insert(0,sys.argv.pop(1));runpy.run_module('scripts.provision_printer',run_name='__main__')",
+        str(ROOT),
         operation,
         "--folder",
         str(folder),
@@ -522,7 +524,7 @@ def install_machine(folder):
                     win32print.AddForm(h, form)
 
 
-def prepare(setup, output):
+def prepare(setup, output, announce=True):
     import win32print
 
     q = workspace()
@@ -621,10 +623,11 @@ def prepare(setup, output):
         with zipfile.ZipFile(output) as z:
             if z.testzip() is not None:
                 raise RuntimeError("Deployment archive failed integrity verification")
-    print("FULL NEW-PC SETUP CREATED:", output)
-    print(
-        "This file contains the installed signed TSC driver and printer settings. Keep it private; do not upload it to GitHub."
-    )
+    if announce:
+        print("FULL NEW-PC SETUP CREATED:", output)
+        print(
+            "This file contains the installed signed TSC driver and printer settings. Keep it private; do not upload it to GitHub."
+        )
     return str(output)
 
 

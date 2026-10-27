@@ -14,6 +14,12 @@ def project(tmp_path):
             Path(__file__).resolve().parents[1] / "scripts/Setup-New-PC.template.cmd"
         ).read_bytes()
     )
+    (tmp_path / "scripts/Export-No-Internet.template.cmd").write_bytes(
+        (
+            Path(__file__).resolve().parents[1]
+            / "scripts/Export-No-Internet.template.cmd"
+        ).read_bytes()
+    )
     (tmp_path / "frontend/dist/assets").mkdir(parents=True)
     (tmp_path / "frontend/dist/index.html").write_text(
         '<script src="/assets/app.js"></script>'
@@ -76,6 +82,18 @@ def test_packages_pin_verified_app_and_exclude_local_state(project):
         creator = offline.read("Prepare-Offline-PC-Setup.cmd")
         assert b"BARCODE_SETUP_MODE=prepare-offline" in creator
         assert digest.encode() in creator
+
+
+def test_zero_download_exporter_includes_verified_app_without_download_step(project):
+    digest = build(project, "a" * 40)
+    with zipfile.ZipFile(project / "downloads/Export-Without-Internet.zip") as z:
+        assert z.namelist() == ["Export-Without-Internet.cmd", "Application.zip"]
+        assert sha256(z.read("Application.zip")).hexdigest() == digest
+        script = z.read("Export-Without-Internet.cmd")
+        assert digest.encode() in script
+        assert b"__APP_SHA256__" not in script
+        assert b"Invoke-WebRequest" not in script
+        assert b"pip install" not in script
 
 
 def test_rebuild_is_deterministic_and_ref_change_does_not_mutate_app(project):

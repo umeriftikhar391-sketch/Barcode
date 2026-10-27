@@ -4,6 +4,12 @@ Local Windows-compatible three-column label application for TSC TE200. React/Typ
 
 **This is software-tested development code, not a production-certified printer release.** Your stated media dimensions total **113 mm**, exceeding the **107 mm backing** and **108 mm printable width**. Defaults are preserved. Production remains locked until corrected measured geometry and actual hardware calibration are recorded. A preview is not proof that a barcode will scan.
 
+## No Internet at either stage
+
+Download [Export-Without-Internet.zip](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Export-Without-Internet.zip) once (or transfer it by USB). On the working PC, extract both files and run **Export-Without-Internet.cmd**. It uses the already installed Python/dependencies and working TE200 driver, with no downloads or pip operation. Select the working **Start-Barcode.cmd** if prompted and approve driver export.
+
+It creates **Barcode-NO-INTERNET-Setup-<date-time>.zip** on your Desktop. Copy that complete ZIP by USB to a new Windows x64 PC, extract it and run **Install-Barcode-OFFLINE.cmd**. Python and dependencies are included privately, so neither stage needs Internet or a global Python install on the target. Windows driver approval and physical verification remain required. See [zero-Internet setup and verification limits](docs/ZERO-INTERNET-SETUP.md). Native Windows relocation and deployment remain unverified here; the exporter tests its private runtime before producing the final ZIP.
+
 ## Offline installer
 
 On your working Windows PC with Internet, download [Prepare-Offline-PC-Setup.zip](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Prepare-Offline-PC-Setup.zip), extract and run **Prepare-Offline-PC-Setup.cmd**. It creates **Barcode-OFFLINE-PC-Setup-<date-time>.zip** on your Desktop, including the full Python installer, all dependency wheels with locked hashes, the built app, and your working driver/media profile.

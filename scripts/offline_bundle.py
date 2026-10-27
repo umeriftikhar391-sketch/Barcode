@@ -319,7 +319,7 @@ def create(setup, output):
         source_cmd = temp / "creator.cmd"
         source_cmd.write_bytes(setup)
         matched = temp / "matched.zip"
-        printer.prepare(source_cmd, matched)
+        printer.prepare(source_cmd, matched, announce=False)
         captured = temp / "captured"
         with zipfile.ZipFile(matched) as z:
             z.extractall(captured)
