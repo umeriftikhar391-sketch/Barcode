@@ -22,6 +22,7 @@ EXCLUDED = {
     "build",
     "downloads",
     "PrinterBundle",
+    "OfflinePayload",
 }
 
 
@@ -81,6 +82,13 @@ def build(root=ROOT, ref="main"):
     )
     with zipfile.ZipFile(downloads / "Prepare-Full-PC-Setup.zip", "w") as archive:
         add_bytes(archive, "Prepare-Full-PC-Setup.cmd", prepare)
+    prepare_offline = contents.replace(
+        b'set "BARCODE_SETUP_MODE=install"',
+        b'set "BARCODE_SETUP_MODE=prepare-offline"',
+        1,
+    )
+    with zipfile.ZipFile(downloads / "Prepare-Offline-PC-Setup.zip", "w") as archive:
+        add_bytes(archive, "Prepare-Offline-PC-Setup.cmd", prepare_offline)
     return digest
 
 

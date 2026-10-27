@@ -28,6 +28,8 @@ def project(tmp_path):
     (tmp_path / ".env.example").write_text("ODOO_API_KEY=")
     (tmp_path / "PrinterBundle").mkdir()
     (tmp_path / "PrinterBundle/devmode.bin").write_bytes(b"private driver profile")
+    (tmp_path / "OfflinePayload").mkdir()
+    (tmp_path / "OfflinePayload/python.exe").write_bytes(b"private offline runtime")
     return tmp_path
 
 
@@ -48,6 +50,7 @@ def test_packages_pin_verified_app_and_exclude_local_state(project):
             or n.endswith("/.env")
             or ".env.production" in n
             or "/PrinterBundle/" in n
+            or "/OfflinePayload/" in n
             for n in names
         )
         assert not any(
@@ -68,6 +71,11 @@ def test_packages_pin_verified_app_and_exclude_local_state(project):
         assert b"BARCODE_SETUP_MODE=prepare" in creator
         assert digest.encode() in creator
         assert b"__SETUP_MODE__" not in creator
+    with zipfile.ZipFile(project / "downloads/Prepare-Offline-PC-Setup.zip") as offline:
+        assert offline.namelist() == ["Prepare-Offline-PC-Setup.cmd"]
+        creator = offline.read("Prepare-Offline-PC-Setup.cmd")
+        assert b"BARCODE_SETUP_MODE=prepare-offline" in creator
+        assert digest.encode() in creator
 
 
 def test_rebuild_is_deterministic_and_ref_change_does_not_mutate_app(project):

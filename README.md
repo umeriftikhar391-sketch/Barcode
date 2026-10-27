@@ -4,6 +4,12 @@ Local Windows-compatible three-column label application for TSC TE200. React/Typ
 
 **This is software-tested development code, not a production-certified printer release.** Your stated media dimensions total **113 mm**, exceeding the **107 mm backing** and **108 mm printable width**. Defaults are preserved. Production remains locked until corrected measured geometry and actual hardware calibration are recorded. A preview is not proof that a barcode will scan.
 
+## Offline installer
+
+On your working Windows PC with Internet, download [Prepare-Offline-PC-Setup.zip](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Prepare-Offline-PC-Setup.zip), extract and run **Prepare-Offline-PC-Setup.cmd**. It creates **Barcode-OFFLINE-PC-Setup-<date-time>.zip** on your Desktop, including the full Python installer, all dependency wheels with locked hashes, the built app, and your working driver/media profile.
+
+Copy that complete ZIP to a new Windows x64 PC, extract it and run **Setup-Barcode-Studio.cmd**. Destination setup uses bundled files only, with no Internet fallback. Windows driver approval and physical verification still apply. See [offline setup instructions and verification limits](docs/OFFLINE-SETUP.md). The creator requires Internet once; the finished Desktop ZIP is the offline installer. Native new-PC Windows offline installation remains unverified here.
+
 ## Final setup including the working TSC driver
 
 On the PC where the TE200 now prints correctly, download [Prepare-Full-PC-Setup.zip](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Prepare-Full-PC-Setup.zip), extract it and run **Prepare-Full-PC-Setup.cmd**. It creates **Barcode-Full-PC-Setup-<date-time>.zip** on your Desktop with the installed signed TSC driver and exact tested printer/media preferences.
