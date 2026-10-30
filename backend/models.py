@@ -52,7 +52,8 @@ class Geometry(Strict):
     dpi: int = Field(default=203, ge=203, le=203)
     density: int = Field(default=8, ge=0, le=15)
     speed: int = Field(default=2, ge=1, le=6)
-    barcode_module: int = Field(default=2, ge=1, le=2, strict=True)
+    # Zero selects the widest supported whole-dot bars that fit each value.
+    barcode_module: int = Field(default=0, ge=0, le=2, strict=True)
 
     def dots(self, mm):
         return int(

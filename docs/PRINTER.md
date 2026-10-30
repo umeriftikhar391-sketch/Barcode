@@ -1,5 +1,10 @@
 # TSC TE200 setup and physical acceptance
 
+The checklist below is optional in the current app and does not lock printing.
+See [automatic fitting and exception labels](EXCEL-BARCODE-WIDTH.md). The confirmed
+stock is 33 × 24 mm, three columns on 107 mm backing with 2 mm gaps/margins.
+The 113/107 contradiction in historical instructions below has been resolved.
+
 **Production is not verified.** Never use the Epson receipt/preparation printer. Linux cannot detect the user's USB Windows printer. No driver installer is bundled or automatically executed.
 
 1. On Windows 10/11 x64 obtain the TE200-compatible driver and user/programming manual from TSC's official support site. Verify package provenance, hash where officially published, publisher signature and compatibility. For the attached installer, first extract without running and inspect `Get-AuthenticodeSignature .\TSC_12.4.0.exe`. Do not accept unsigned/untrusted results or disable verification to install it.

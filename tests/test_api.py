@@ -32,7 +32,11 @@ def test_security(client):
     )
 
 
-def test_queue_preview_and_lock(client):
+def test_queue_preview_and_print_without_checklist(client, monkeypatch):
+    submitted = []
+    monkeypatch.setattr(
+        module.printers, "submit", lambda *args: submitted.append(args) or 42
+    )
     q = Queue(products=[product()], geometry=valid()).model_dump(mode="json")
     assert client.put("/api/queue", json=q).status_code == 200
     assert client.get("/api/queue").json() == q
@@ -44,8 +48,10 @@ def test_queue_preview_and_lock(client):
         client.post(
             "/api/print", json={"id": "test-lock", "queue": q, "printer": "TSC"}
         ).status_code
-        == 400
+        == 200
     )
+    assert len(submitted) == 1
+    assert module.get_setting("calibration") is None
     q["products"][0]["quantity"] = 0
     assert client.put("/api/queue", json=q).status_code == 422
 
@@ -181,3 +187,36 @@ def test_known_driver_preflight_error_is_visible(client, monkeypatch):
     assert r["status"].startswith("Blocked before submission")
     assert "24 mm" in r["detail"]
     assert r["spool_id"] is None
+
+
+def test_auto_print_continues_with_marked_exceptions_without_calibration(
+    client, monkeypatch
+):
+    q = Queue(
+        products=[
+            product(barcode="W" * 128, quantity=2),
+            product(barcode="1000459-10"),
+        ],
+        geometry=valid(),
+    )
+    submitted = []
+    monkeypatch.setattr(
+        module.printers, "submit", lambda *args: submitted.append(args) or 42
+    )
+    data = q.model_dump(mode="json")
+    report = client.post("/api/validate", json=data).json()
+    assert report["content_errors"] == []
+    assert report["content_warnings"][0]["exception"] is True
+    assert report["labels"] == 3
+    assert client.post("/api/preview/0", json=data).status_code == 200
+    assert module.get_setting("calibration") is None
+    ready = client.post(
+        "/api/readiness", json={"geometry": data["geometry"], "printer": "TSC"}
+    ).json()
+    assert ready["production_ready"] and not ready["calibration_recorded"]
+    result = client.post(
+        "/api/print", json={"id": "exception-print", "queue": data, "printer": "TSC"}
+    ).json()
+    assert result["spool_id"] == 42
+    assert "2 exception labels" in result["detail"]
+    assert [p.barcode for p in submitted[0][0].products] == ["W" * 128, "1000459-10"]

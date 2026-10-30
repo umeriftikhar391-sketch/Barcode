@@ -292,15 +292,15 @@ function App() {
         <div className="warning">
           <b>
             {productionReady
-              ? "Production Ready — operator calibration recorded"
+              ? "Ready to print"
               : report?.state || "Checking readiness"}
           </b>
           {report?.geometry_errors?.map((s: string) => (
             <p key={s}>{s}</p>
           ))}
           <small>
-            Digital preview does not prove physical alignment. Production
-            requires confirmed dimensions and calibration.
+            Calibration checklists are optional. Inspect the preview and printed
+            output.
           </small>
         </div>
         {report?.content_errors?.length > 0 && (
@@ -308,6 +308,18 @@ function App() {
             {report.content_errors.map((e: any) => (
               <p key={e.id}>
                 {q.products.find((p) => p.id === e.id)?.name}: {e.error}
+              </p>
+            ))}
+          </div>
+        )}
+        {report?.content_warnings?.length > 0 && (
+          <div className="warning" role="status">
+            <b>
+              Printing continues with these adjustments or exception labels:
+            </b>
+            {report.content_warnings.map((item: any) => (
+              <p key={item.id}>
+                {q.products.find((p) => p.id === item.id)?.name}: {item.warning}
               </p>
             ))}
           </div>
@@ -1066,8 +1078,9 @@ function App() {
             <section>
               <h2>Printer &amp; physical media</h2>
               <p>
-                Original measurements are preserved as defaults. Every geometry,
-                printer or method change requires new calibration.
+                Keep your measured media dimensions. Automatic fit chooses bar
+                width for each product; no calibration checklist is required to
+                print.
               </p>
               <div className="fields">
                 <label>
@@ -1105,7 +1118,7 @@ function App() {
                 Barcode bar width
                 <select
                   aria-label="Barcode bar width"
-                  value={q.geometry.barcode_module ?? 2}
+                  value={q.geometry.barcode_module ?? 0}
                   onChange={(e) =>
                     setQ({
                       ...q,
@@ -1116,19 +1129,21 @@ function App() {
                     })
                   }
                 >
+                  <option value={0}>
+                    Automatic fit · standard or narrow bars
+                  </option>
                   <option value={2}>Standard bars · 2 printer dots</option>
                   <option value={1}>
                     Narrow bars · 1 printer dot · scan test required
                   </option>
                 </select>
               </label>
-              {q.geometry.barcode_module === 1 && (
+              {q.geometry.barcode_module !== 2 && (
                 <p className="warning">
-                  Narrow bars fit longer barcodes on small stickers. At 203 DPI,
-                  scanning may be less reliable. Print the new calibration
-                  sample and scan every label with your usual scanner before
-                  recording calibration. Test your longest real product barcode
-                  too.
+                  Narrow bars may scan less reliably at 203 DPI. In Automatic
+                  fit, values that cannot fit produce a marked exception label
+                  with the full value and no scannable barcode. Other labels
+                  keep printing.
                 </p>
               )}
               <button
@@ -1200,87 +1215,94 @@ function App() {
               </details>
             </section>
             <section>
-              <h2>Physical verification checklist</h2>
-              <button
-                disabled={
-                  busy || !printer || report?.geometry_errors?.length > 0
-                }
-                onClick={() =>
-                  act(async () => {
-                    if (
-                      !confirm(
-                        "Physically print 7 calibration labels across 3 rows? This consumes media. Geometry must be measured and safe.",
+              <details>
+                <summary>Optional alignment and scanner checks</summary>
+                <h2>Physical verification checklist</h2>
+                <button
+                  disabled={
+                    busy || !printer || report?.geometry_errors?.length > 0
+                  }
+                  onClick={() =>
+                    act(async () => {
+                      if (
+                        !confirm(
+                          "Physically print 7 calibration labels across 3 rows? This consumes media. Geometry must be measured and safe.",
+                        )
                       )
-                    )
-                      return;
-                    const r = await api("calibration-test", "POST", {
-                      id: crypto.randomUUID(),
-                      geometry: q.geometry,
-                      printer,
-                      mode,
-                      approved: true,
-                      command_reference_verified:
-                        checks.command_reference_verified || false,
-                    });
-                    setNotice([r.status, r.detail].filter(Boolean).join(": "));
-                    setJobs(await api("jobs"));
-                  })
-                }
-              >
-                Print approved 7-label calibration sample…
-              </button>
-              <p>
-                Use the procedures in docs/PRINTER.md with a technician. These
-                confirmations record operator evidence; software cannot verify
-                the physical output.
-              </p>
-              {[
-                ["measured", "I measured and confirmed every media dimension"],
-                ["alignment", "All three columns align within safe margins"],
-                ["scanned", "Every barcode scans to its exact value"],
-                ["multirow", "Consecutive rows show no vertical drift"],
-                ["boundary", "Separate jobs each start LEFT on a fresh row"],
-                ["counts", "Physical counts match requested quantities"],
-                [
-                  "command_reference_verified",
-                  "For direct mode: TSPL commands verified against the official TE200 manual",
-                ],
-              ].map(([k, t]) => (
-                <label className="check" key={k}>
-                  <input
-                    type="checkbox"
-                    checked={checks[k] || false}
-                    onChange={(e) =>
-                      setChecks({ ...checks, [k]: e.target.checked })
-                    }
-                  />
-                  {t}
-                </label>
-              ))}
-              <button
-                disabled={
-                  busy || !printer || report?.geometry_errors?.length > 0
-                }
-                onClick={() =>
-                  act(async () => {
-                    const c = await api("calibration", "POST", {
-                      geometry: q.geometry,
-                      printer,
-                      mode,
-                      ...checks,
-                    });
-                    setNotice(c.state);
-                    setProductionReady(true);
-                  })
-                }
-              >
-                Record completed physical calibration
-              </button>
-              <p className="warning">
-                Production printing is blocked until calibration is recorded.
-                Driver setup, alignment tests, scanner checks and exact feeding
-                must be performed on Windows.
-              </p>
+                        return;
+                      const r = await api("calibration-test", "POST", {
+                        id: crypto.randomUUID(),
+                        geometry: q.geometry,
+                        printer,
+                        mode,
+                        approved: true,
+                        command_reference_verified:
+                          checks.command_reference_verified || false,
+                      });
+                      setNotice(
+                        [r.status, r.detail].filter(Boolean).join(": "),
+                      );
+                      setJobs(await api("jobs"));
+                    })
+                  }
+                >
+                  Print approved 7-label calibration sample…
+                </button>
+                <p>
+                  Use the procedures in docs/PRINTER.md with a technician. These
+                  confirmations record operator evidence; software cannot verify
+                  the physical output.
+                </p>
+                {[
+                  [
+                    "measured",
+                    "I measured and confirmed every media dimension",
+                  ],
+                  ["alignment", "All three columns align within safe margins"],
+                  ["scanned", "Every barcode scans to its exact value"],
+                  ["multirow", "Consecutive rows show no vertical drift"],
+                  ["boundary", "Separate jobs each start LEFT on a fresh row"],
+                  ["counts", "Physical counts match requested quantities"],
+                  [
+                    "command_reference_verified",
+                    "For direct mode: TSPL commands verified against the official TE200 manual",
+                  ],
+                ].map(([k, t]) => (
+                  <label className="check" key={k}>
+                    <input
+                      type="checkbox"
+                      checked={checks[k] || false}
+                      onChange={(e) =>
+                        setChecks({ ...checks, [k]: e.target.checked })
+                      }
+                    />
+                    {t}
+                  </label>
+                ))}
+                <button
+                  disabled={
+                    busy || !printer || report?.geometry_errors?.length > 0
+                  }
+                  onClick={() =>
+                    act(async () => {
+                      const c = await api("calibration", "POST", {
+                        geometry: q.geometry,
+                        printer,
+                        mode,
+                        ...checks,
+                      });
+                      setNotice(c.state);
+                      setProductionReady(true);
+                    })
+                  }
+                >
+                  Record completed physical calibration
+                </button>
+                <p className="warning">
+                  These checks help verify physical output. You can print
+                  without completing or recording this checklist.
+                </p>
+              </details>
               <button
                 className="primary"
                 disabled={
@@ -1370,8 +1392,7 @@ function App() {
           <span role="status" aria-label="Queue save status">
             {saveState}
           </span>{" "}
-          · Barcode Studio · Offline preparation · Physical output requires
-          verified calibration
+          · Barcode Studio · Offline printing · Calibration checklist optional
         </footer>
       </main>
     </div>

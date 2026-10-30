@@ -68,22 +68,54 @@ def text_fit(draw, text, box, min_size=12, max_size=20, lines=1, bold=False):
     raise ValueError(f"Text cannot fit without truncation: {text}")
 
 
-def label(product, g):
+def label(product, g, warnings=None):
     w, h = g.dots(g.width), g.dots(g.height)
     s = g.dots(g.safe)
     im = Image.new("1", (w, h), 1)
     d = ImageDraw.Draw(im)
-    text_fit(d, product.name, (s, s, w - 2 * s, 48), 12, 20, 2, True)
+    try:
+        text_fit(d, product.name, (s, s, w - 2 * s, 48), 12, 20, 2, True)
+    except ValueError as exc:
+        if g.barcode_module != 0 or not str(exc).startswith("Text cannot fit"):
+            raise
+        # Only the display name may be shortened; barcode and price stay exact.
+        trial = ImageDraw.Draw(Image.new("1", (w, h), 1))
+        lo, hi, best = 0, len(product.name) - 1, None
+        while lo <= hi:
+            end = (lo + hi) // 2
+            candidate = product.name[:end].rstrip() + "..."
+            try:
+                text_fit(
+                    trial,
+                    candidate,
+                    (s, s, w - 2 * s, 48),
+                    12,
+                    20,
+                    2,
+                    True,
+                )
+                best, lo = candidate, end + 1
+            except ValueError:
+                hi = end - 1
+        if best is None:
+            raise ValueError("No room for a product name")
+        text_fit(d, best, (s, s, w - 2 * s, 48), 12, 20, 2, True)
+        if warnings is not None:
+            warnings.append(
+                "Printed product name shortened; full name remains in the queue."
+            )
     bits = Code128(product.barcode).build()[0]
-    # Narrow bars require an explicit profile choice and fresh physical scans.
+    # Automatic fitting selects between standard and narrow bars per value.
     # Draw whole printer dots; never resample bars or crop the ten-module quiet zones.
     module = g.barcode_module
+    if module == 0:
+        module = 2 if (len(bits) + 20) * 2 <= w - 2 * s else 1
     bw = (len(bits) + 20) * module
     if bw > w - 2 * s:
         raise ValueError(
             f"Barcode {product.barcode} needs {bw} dots including quiet zones; only {w - 2 * s} available. "
             + (
-                "For this roll, select Narrow bars in Printer settings and print/scan the new calibration sample."
+                "For this roll, select Automatic fit or Narrow bars in Printer settings."
                 if module == 2
                 else "Even narrow bars do not fit; use wider labels or a suitable higher-resolution printer."
             )
@@ -118,6 +150,45 @@ def label(product, g):
     return im
 
 
+def exception_label(product, g):
+    """A counted, visibly marked exception, never a fabricated barcode."""
+    w, h, s = g.dots(g.width), g.dots(g.height), g.dots(g.safe)
+    im = Image.new("1", (w, h), 1)
+    d = ImageDraw.Draw(im)
+    font = ImageFont.truetype(font_path(), 10)
+    # Printable ASCII barcode values are schema-validated and at most 128 chars.
+    lines, current = [], ""
+    for char in product.barcode:
+        if current and d.textlength(current + char, font=font) > w - 2 * s:
+            lines.append(current)
+            current = ""
+        current += char
+    lines.append(current)
+    needed = 34 + len(lines) * 13
+    if needed > h - 2 * s:
+        raise ValueError("Label too small even for a readable exception value")
+    d.text((s, s), "CHECK LABEL - NO BARCODE", font=font, fill=0)
+    for i, line in enumerate(lines):
+        d.text((s, s + 17 + i * 13), line, font=font, fill=0)
+    price = f"{product.symbol} {product.price:f}"
+    text_fit(d, price, (s, h - s - 17, w - 2 * s, 17), 8, 12)
+    return im
+
+
+def render_label(product, g):
+    warnings = []
+    try:
+        return label(product, g, warnings), warnings, False
+    except ValueError as exc:
+        if g.barcode_module != 0:
+            raise
+        return (
+            exception_label(product, g),
+            [f"Exception label: no scannable barcode. {exc}"],
+            True,
+        )
+
+
 def raster_row(row, g, strict=False):
     if strict and g.errors():
         raise ValueError("; ".join(g.errors()))
@@ -128,7 +199,7 @@ def raster_row(row, g, strict=False):
     im = Image.new("1", (g.dots(extent), g.dots(g.height)), 1)
     for col, p in enumerate(row):
         if p:
-            tile = label(p, g)
+            tile = render_label(p, g)[0]
             x = g.dots(g.left + col * (g.width + g.gap_x) + g.offset_x)
             y = g.dots(g.top)
             if y + tile.height > im.height:

@@ -100,7 +100,7 @@ def update(target, archive, expected):
     )
     print("Previous application files: " + str(backup))
     print(
-        "Open Printer settings and choose Narrow bars, then print and scan the new calibration sample."
+        "Automatic fit is enabled on first launch. Calibration checklists are optional. Review preview warnings before printing."
     )
 
 

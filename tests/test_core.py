@@ -63,7 +63,7 @@ def test_barcodes(code):
 
 def test_long_barcode_cannot_shrink():
     with pytest.raises(ValueError, match="needs"):
-        label(product(barcode="ABCD-1234-AC2026"), Geometry())
+        label(product(barcode="ABCD-1234-AC2026"), Geometry(barcode_module=2))
 
 
 @pytest.mark.parametrize("value", [123, "中文", "a\nb", ""])

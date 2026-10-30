@@ -10,7 +10,7 @@ from pydantic import Field
 from PIL import ImageDraw
 from .models import Queue, Geometry, Strict, Product
 from .layout import rows
-from .render import raster_row, label, tspl
+from .render import raster_row, render_label, tspl
 from .importer import inspect_file, propose, convert
 from . import odoo, printers
 
@@ -100,12 +100,27 @@ def session():
 
 @app.get("/api/queue")
 def load_queue():
-    return get_setting("queue", Queue().model_dump(mode="json"))
+    # One-time upgrade; retain all product data and physical media measurements.
+    with db() as c:
+        saved = c.execute("SELECT value FROM settings WHERE key='queue'").fetchone()
+        q = Queue.model_validate_json(saved[0]) if saved else Queue()
+        migrated = c.execute(
+            "SELECT 1 FROM settings WHERE key='auto_fit_v1'"
+        ).fetchone()
+        if not migrated:
+            q.geometry.barcode_module = 0
+            c.execute(
+                "INSERT OR REPLACE INTO settings VALUES ('queue',?)",
+                (q.model_dump_json(),),
+            )
+            c.execute("INSERT OR IGNORE INTO settings VALUES ('auto_fit_v1','true')")
+    return q.model_dump(mode="json")
 
 
 @app.put("/api/queue")
 def save_queue(q: Queue):
     put_setting("queue", q.model_dump(mode="json"))
+    put_setting("auto_fit_v1", True)
     return {"saved": True}
 
 
@@ -113,19 +128,30 @@ def save_queue(q: Queue):
 def validate(q: Queue):
     errors = q.geometry.errors()
     content = []
+    warnings = []
     for p in q.products:
         try:
-            label(p, q.geometry)
+            _, notices, exception = render_label(p, q.geometry)
+            if notices:
+                warnings.append(
+                    {
+                        "id": p.id,
+                        "warning": " ".join(notices),
+                        "exception": exception,
+                        "quantity": p.quantity,
+                    }
+                )
         except ValueError as e:
             content.append({"id": p.id, "error": str(e)})
     return {
         "geometry_errors": errors,
         "content_errors": content,
+        "content_warnings": warnings,
         "labels": sum(p.quantity for p in q.products),
         "rows": len(rows(q.products)),
         "state": "Invalid geometry — preview only"
         if errors
-        else "Geometry Valid — Hardware Calibration Pending",
+        else "Ready to print — calibration checklist optional",
     }
 
 
@@ -201,14 +227,15 @@ class Readiness(Strict):
 
 @app.post("/api/readiness")
 def readiness(r: Readiness):
-    ready = not r.geometry.errors() and get_setting("calibration") == fingerprint(
+    calibrated = get_setting("calibration") == fingerprint(
         r.geometry, r.printer, r.mode
     )
     return {
-        "production_ready": ready,
+        "production_ready": not r.geometry.errors(),
+        "calibration_recorded": calibrated,
         "basis": "Operator-confirmed physical calibration"
-        if ready
-        else "Physical calibration not recorded for this profile",
+        if calibrated
+        else "Calibration checklist optional; inspect printed output",
     }
 
 
@@ -251,10 +278,6 @@ def print_job(p: PrintRequest):
         raise ValueError("Empty queue cannot be printed")
     if p.mode not in ["driver", "raw"]:
         raise ValueError("Invalid print method")
-    if get_setting("calibration") != fingerprint(p.queue.geometry, p.printer, p.mode):
-        raise ValueError(
-            "Production printing locked: complete physical calibration for this geometry, printer and method"
-        )
     for row in rows(p.queue.products):
         raster_row(row, p.queue.geometry, True)
     return dispatch(p)
@@ -273,9 +296,19 @@ def dispatch(p):
                 (p.id, "Prepared", p.printer, None, ""),
             )
         try:
+            report = validate(p.queue)
             job = printers.submit(p.queue, p.printer, p.mode)
             status = "Accepted by Spooler — Physical Confirmation Pending"
-            detail = ""
+            exceptions = sum(
+                item["quantity"]
+                for item in report["content_warnings"]
+                if item["exception"]
+            )
+            detail = (
+                f"{exceptions} exception labels have no scannable barcode; see preview warnings."
+                if exceptions
+                else ""
+            )
         except printers.PrinterPreflightError as exc:
             job = None
             status = "Blocked before submission — driver settings need correction"
@@ -324,12 +357,12 @@ def calibration_sample(s: CalibrationSample):
                         "1000459-10",
                         "1000459-10",
                         "1000459-10",
-                        "1000459-1",
-                        "1000704-2",
-                        "0001234567",
+                        "000001" if s.geometry.barcode_module == 0 else "1000459-1",
+                        "000002" if s.geometry.barcode_module == 0 else "1000704-2",
+                        "000003" if s.geometry.barcode_module == 0 else "0001234567",
                         "1000112-3",
                     ][i]
-                    if s.geometry.barcode_module == 1
+                    if s.geometry.barcode_module in (0, 1)
                     else f"00000{i + 1}"
                 ),
                 price="0",

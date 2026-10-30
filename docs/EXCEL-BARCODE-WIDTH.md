@@ -1,47 +1,45 @@
-# Longer Excel barcodes on 33 × 24 mm stickers
+# Automatic barcode fitting and offline update
 
 The confirmed roll is 107 mm wide, with three 33 × 24 mm stickers, 2 mm
 horizontal/vertical gaps, 2 mm side margins and 2 mm internal safe margins.
-At 203 DPI, the safe content area is 232 dots wide. Standard two-dot Code 128
-bars, including ten-module quiet zones at both ends, need 264 dots for
-`1000459-1` and 286 dots for `1000459-10`. Importing Excel does not cause this
-width limit; short calibration numbers fit while these longer values do not.
 
-## Apply the update to a working PC
+## Update the working PC
 
-1. Obtain `downloads/Barcode-Excel-Print-Update.zip` and extract all files.
-   It can be transferred to a disconnected PC by USB.
-2. Close the Barcode Studio server console window. Closing its browser tab alone
-   does not stop the application.
-3. Run `Update-Barcode.cmd`. It finds the Desktop shortcut or asks you to select
-   your existing `Start-Barcode.cmd`. Select the working installation, not the
-   downloaded update folder.
-4. The updater verifies the bundled application archive, backs up the existing
-   backend and built frontend under `.update-backups`, replaces those two folders,
-   and opens the app. Python, printer driver, saved queue and media dimensions are
-   preserved. No Internet, pip, new Python installation or administrator approval
-   is needed for this application-only update.
+1. Download `downloads/Barcode-Auto-Fit-Update.zip`, or transfer it by USB.
+2. Close Barcode Studio's server console window, not just the browser tab.
+3. Extract the entire ZIP and run **Update-Barcode.cmd**. If prompted, choose
+   **Start-Barcode.cmd** from your working app folder.
+4. The app opens with **Automatic fit** enabled. Select your TE200 and print.
+   No checklist boxes or calibration record are required.
 
-## Test narrow bars
+The updater uses the existing Python installation and printer driver. It requires
+no Internet, pip or new dependencies, and preserves products and physical media
+dimensions. Previous backend and frontend files are saved under `.update-backups`.
+The updater and physical printer still need verification on Windows.
 
-1. Open **Printer settings → Barcode bar width** and select
-   **Narrow bars · 1 printer dot · scan test required**.
-2. Keep all media dimensions and printer preferences at their successfully tested
-   values. Changing bar width requires a separate physical calibration confirmation.
-3. Print the approved seven-label calibration sample. In narrow mode it includes
-   `1000459-10` in all three columns of the first row, then `1000459-1`,
-   `1000704-2`, `0001234567` and `1000112-3` across the following rows.
-4. Scan every label with the actual production scanner and compare every character,
-   including hyphens and leading zeros. Repeat the sample as an independent job
-   and check that it starts at the left of a fresh row. Also test the longest real
-   product code if your workbook changes.
-5. Only after the physical tests pass, check the applicable checklist items and
-   record completed physical calibration. For Windows driver/GDI, leave the
-   direct-TSPL command confirmation unchecked. Review the Excel preview, then print.
+## What is automatic
 
-One-dot bars are about 0.125 mm wide at 203 DPI and may be less reliable with
-some scanners or print conditions. Digital decoding of a clean raster is not
-proof of physical readability. If the actual scanner cannot read these samples
-reliably, retain standard bars and use wider labels or a suitable higher-resolution
-printer. Values are never shortened, quiet zones are never cropped, and barcodes
-that exceed even the narrow-mode width remain blocked.
+- Each Code 128 value uses two printer dots per module when it fits, or one dot
+  when necessary. Both quiet zones are preserved. There is no fractional-dot
+  scaling, clipping, substituted code or change to the underlying value.
+- Long product names are fitted across two lines. If necessary, the printed
+  display name ends in `...`; its full original remains in the queue and the
+  preview warnings explain the adjustment.
+- If even one-dot bars cannot fit, a **CHECK LABEL - NO BARCODE** exception label
+  prints with the full original barcode value as wrapped text and its price.
+  That label contains no scannable barcode. Other products keep printing.
+  The requested quantities and positions include exception labels; nothing is
+  silently skipped. Preview warnings and print submission details identify them.
+- Optional manual standard/narrow modes retain strict fit errors. Automatic fit
+  is enabled once on upgrade; a later explicit manual selection is respected.
+- The calibration checklist remains available in a collapsed optional section.
+  Recording calibration is not a prerequisite for printing.
+
+One-dot bars at 203 DPI are about 0.125 mm wide and can be less reliable on real
+scanners. Software cannot guarantee a scannable barcode of arbitrary length on
+a fixed-size sticker. Inspect the printed output. If narrow bars are unreliable,
+wider labels or a suitable higher-resolution printer are needed.
+
+Actual hardware failures, an unavailable printer, invalid media dimensions and
+possibly partial submissions still produce truthful errors. Duplicate-job and
+uncertain-print handling remains in place to avoid unintended duplicate labels.

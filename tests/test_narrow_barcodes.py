@@ -8,14 +8,16 @@ from backend.app import fingerprint, calibration_sample, CalibrationSample
 
 
 def profile(**kwargs):
-    return Geometry(width=33, height=24, safe=2, **kwargs)
+    return Geometry(
+        **({"width": 33, "height": 24, "safe": 2, "barcode_module": 2} | kwargs)
+    )
 
 
 def product(code):
     return Product(name="Stole", barcode=code, price="22", symbol="$", quantity=1)
 
 
-@pytest.mark.parametrize("value", [0, 3, 1.5, True, "1"])
+@pytest.mark.parametrize("value", [-1, 3, 1.5, True, "1"])
 def test_whole_supported_dot_widths_only(value):
     with pytest.raises(ValidationError):
         profile(barcode_module=value)
@@ -40,7 +42,7 @@ def test_narrow_bars_are_exact_code128_with_quiet_zones(code):
 
 def test_no_implicit_narrowing_or_changed_value():
     p = product("1000459-10")
-    with pytest.raises(ValueError, match="select Narrow bars"):
+    with pytest.raises(ValueError, match="select Automatic fit"):
         label(p, profile())
     with pytest.raises(ValueError, match="Even narrow bars do not fit"):
         label(
@@ -58,7 +60,7 @@ def test_narrow_profile_needs_its_own_calibration():
     assert fingerprint(profile(barcode_module=1), "TSC", "driver") != legacy
 
 
-@pytest.mark.parametrize("module", [1, 2])
+@pytest.mark.parametrize("module", [0, 1, 2])
 def test_calibration_uses_long_barcodes_for_narrow_mode(monkeypatch, module):
     captured = []
     monkeypatch.setattr(
@@ -75,5 +77,5 @@ def test_calibration_uses_long_barcodes_for_narrow_mode(monkeypatch, module):
     products = captured[0].queue.products
     assert len(products) == 7
     assert [p.barcode for p in products[:3]] == (
-        ["1000459-10"] * 3 if module == 1 else ["000001", "000002", "000003"]
+        ["1000459-10"] * 3 if module != 2 else ["000001", "000002", "000003"]
     )

@@ -117,6 +117,9 @@ def build(root=ROOT, ref="main"):
                 (root / "scripts/update_existing.py").read_bytes(),
             )
             add_bytes(archive, "Application.zip", target.read_bytes())
+        (downloads / "Barcode-Auto-Fit-Update.zip").write_bytes(
+            (downloads / "Barcode-Excel-Print-Update.zip").read_bytes()
+        )
     return digest
 
 
