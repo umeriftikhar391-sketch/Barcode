@@ -75,12 +75,18 @@ def label(product, g):
     d = ImageDraw.Draw(im)
     text_fit(d, product.name, (s, s, w - 2 * s, 48), 12, 20, 2, True)
     bits = Code128(product.barcode).build()[0]
-    # At 203 DPI use at least two dots/module and ten modules of quiet zone.
-    module = 2
+    # Narrow bars require an explicit profile choice and fresh physical scans.
+    # Draw whole printer dots; never resample bars or crop the ten-module quiet zones.
+    module = g.barcode_module
     bw = (len(bits) + 20) * module
     if bw > w - 2 * s:
         raise ValueError(
-            f"Barcode {product.barcode} needs {bw} dots including quiet zones; only {w - 2 * s} available"
+            f"Barcode {product.barcode} needs {bw} dots including quiet zones; only {w - 2 * s} available. "
+            + (
+                "For this roll, select Narrow bars in Printer settings and print/scan the new calibration sample."
+                if module == 2
+                else "Even narrow bars do not fit; use wider labels or a suitable higher-resolution printer."
+            )
         )
     x = (w - bw) // 2 + 10 * module
     y = s + 52

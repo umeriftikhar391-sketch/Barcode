@@ -20,6 +20,10 @@ def project(tmp_path):
             / "scripts/Export-No-Internet.template.cmd"
         ).read_bytes()
     )
+    for name in ("Update-Existing.template.cmd", "update_existing.py"):
+        (tmp_path / "scripts" / name).write_bytes(
+            (Path(__file__).resolve().parents[1] / "scripts" / name).read_bytes()
+        )
     (tmp_path / "frontend/dist/assets").mkdir(parents=True)
     (tmp_path / "frontend/dist/index.html").write_text(
         '<script src="/assets/app.js"></script>'
@@ -44,6 +48,19 @@ def test_packages_pin_verified_app_and_exclude_local_state(project):
     digest = build(project, ref)
     app = (project / "downloads/Barcode-Studio.zip").read_bytes()
     assert sha256(app).hexdigest() == digest
+    with zipfile.ZipFile(
+        project / "downloads/Barcode-Excel-Print-Update.zip"
+    ) as update:
+        assert update.namelist() == [
+            "Update-Barcode.cmd",
+            "update_existing.py",
+            "Application.zip",
+        ]
+        assert update.read("Application.zip") == app
+        cmd = update.read("Update-Barcode.cmd")
+        assert digest.encode() in cmd
+        assert b"Invoke-WebRequest" not in cmd
+        assert b"pip install" not in cmd
     with zipfile.ZipFile(project / "downloads/Barcode-Studio.zip") as archive:
         assert archive.testzip() is None
         names = archive.namelist()

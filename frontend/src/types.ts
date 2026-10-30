@@ -26,6 +26,7 @@ export type Geometry = {
   dpi: number;
   density: number;
   speed: number;
+  barcode_module: number;
 };
 export type Queue = { products: Product[]; geometry: Geometry };
 export const currencies = [

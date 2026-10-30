@@ -25,6 +25,7 @@ EXCLUDED = {
     "OfflinePayload",
     "Payload",
     "Runtime",
+    ".update-backups",
 }
 
 
@@ -99,6 +100,22 @@ def build(root=ROOT, ref="main"):
         cmd = text.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
         with zipfile.ZipFile(downloads / "Export-Without-Internet.zip", "w") as archive:
             add_bytes(archive, "Export-Without-Internet.cmd", cmd)
+            add_bytes(archive, "Application.zip", target.read_bytes())
+    update_template = root / "scripts/Update-Existing.template.cmd"
+    if update_template.exists():
+        text = update_template.read_text(encoding="utf-8").replace(
+            "__APP_SHA256__", digest
+        )
+        cmd = text.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
+        with zipfile.ZipFile(
+            downloads / "Barcode-Excel-Print-Update.zip", "w"
+        ) as archive:
+            add_bytes(archive, "Update-Barcode.cmd", cmd)
+            add_bytes(
+                archive,
+                "update_existing.py",
+                (root / "scripts/update_existing.py").read_bytes(),
+            )
             add_bytes(archive, "Application.zip", target.read_bytes())
     return digest
 

@@ -1101,6 +1101,36 @@ function App() {
                   </select>
                 </label>
               </div>
+              <label>
+                Barcode bar width
+                <select
+                  aria-label="Barcode bar width"
+                  value={q.geometry.barcode_module ?? 2}
+                  onChange={(e) =>
+                    setQ({
+                      ...q,
+                      geometry: {
+                        ...q.geometry,
+                        barcode_module: Number(e.target.value),
+                      },
+                    })
+                  }
+                >
+                  <option value={2}>Standard bars · 2 printer dots</option>
+                  <option value={1}>
+                    Narrow bars · 1 printer dot · scan test required
+                  </option>
+                </select>
+              </label>
+              {q.geometry.barcode_module === 1 && (
+                <p className="warning">
+                  Narrow bars fit longer barcodes on small stickers. At 203 DPI,
+                  scanning may be less reliable. Print the new calibration
+                  sample and scan every label with your usual scanner before
+                  recording calibration. Test your longest real product barcode
+                  too.
+                </p>
+              )}
               <button
                 onClick={() =>
                   act(async () => {
@@ -1119,47 +1149,49 @@ function App() {
               <details>
                 <summary>Advanced media geometry · millimeters</summary>
                 <div className="fields">
-                  {Object.entries(q.geometry).map(([k, v]) => (
-                    <label key={k}>
-                      {
-                        (
-                          {
-                            backing: "Backing width",
-                            width: "Label width",
-                            height: "Label height",
-                            gap_x: "Horizontal gap",
-                            gap_y: "Vertical gap",
-                            left: "Left margin",
-                            right: "Right margin",
-                            top: "Top print offset",
-                            offset_x: "Horizontal print offset",
-                            origin: "Printable origin",
-                            safe: "Internal safe margin",
-                            printable: "Printable width",
-                            dpi: "Resolution (DPI)",
-                            columns: "Columns",
-                            density: "Darkness (0–15)",
-                            speed: "Speed (in/s)",
-                          } as Record<string, string>
-                        )[k]
-                      }
-                      <input
-                        type="number"
-                        step="0.1"
-                        disabled={k === "dpi" || k === "columns"}
-                        value={v}
-                        onChange={(e) =>
-                          setQ({
-                            ...q,
-                            geometry: {
-                              ...q.geometry,
-                              [k]: Number(e.target.value),
-                            },
-                          })
+                  {Object.entries(q.geometry)
+                    .filter(([k]) => k !== "barcode_module")
+                    .map(([k, v]) => (
+                      <label key={k}>
+                        {
+                          (
+                            {
+                              backing: "Backing width",
+                              width: "Label width",
+                              height: "Label height",
+                              gap_x: "Horizontal gap",
+                              gap_y: "Vertical gap",
+                              left: "Left margin",
+                              right: "Right margin",
+                              top: "Top print offset",
+                              offset_x: "Horizontal print offset",
+                              origin: "Printable origin",
+                              safe: "Internal safe margin",
+                              printable: "Printable width",
+                              dpi: "Resolution (DPI)",
+                              columns: "Columns",
+                              density: "Darkness (0–15)",
+                              speed: "Speed (in/s)",
+                            } as Record<string, string>
+                          )[k]
                         }
-                      />
-                    </label>
-                  ))}
+                        <input
+                          type="number"
+                          step="0.1"
+                          disabled={k === "dpi" || k === "columns"}
+                          value={v}
+                          onChange={(e) =>
+                            setQ({
+                              ...q,
+                              geometry: {
+                                ...q.geometry,
+                                [k]: Number(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                    ))}
                 </div>
                 <p>
                   Row pitch: {q.geometry.height + q.geometry.gap_y} mm · Gap

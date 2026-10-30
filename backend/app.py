@@ -52,7 +52,11 @@ def put_setting(key, value):
 
 
 def fingerprint(g, printer, mode):
-    return hashlib.sha256((g.model_dump_json() + printer + mode).encode()).hexdigest()
+    # Keep existing standard-width confirmations valid; narrow profiles are distinct.
+    excluded = {"barcode_module"} if g.barcode_module == 2 else set()
+    return hashlib.sha256(
+        (g.model_dump_json(exclude=excluded) + printer + mode).encode()
+    ).hexdigest()
 
 
 app = FastAPI(title="Barcode Studio", docs_url=None, redoc_url=None, openapi_url=None)
@@ -315,7 +319,19 @@ def calibration_sample(s: CalibrationSample):
         products=[
             Product(
                 name=f"{['Left', 'Middle', 'Right'][i % 3]} {i + 1}",
-                barcode=f"00000{i + 1}",
+                barcode=(
+                    [
+                        "1000459-10",
+                        "1000459-10",
+                        "1000459-10",
+                        "1000459-1",
+                        "1000704-2",
+                        "0001234567",
+                        "1000112-3",
+                    ][i]
+                    if s.geometry.barcode_module == 1
+                    else f"00000{i + 1}"
+                ),
                 price="0",
                 symbol="Rs.",
                 quantity=1,
