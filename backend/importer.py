@@ -18,6 +18,17 @@ ALIASES = {
     "price": ["price", "salesprice", "sellingprice", "rate", "retailprice"],
     "symbol": ["currency", "currencysymbol", "symbol", "curr"],
 }
+PRINT_QUANTITY_HEADERS = {
+    "printqty",
+    "printquantity",
+    "labelqty",
+    "labelquantity",
+    "labels",
+    "copies",
+    "quantitytoprint",
+    "numberoflabels",
+}
+ALIASES["quantity"] = list(set(ALIASES["quantity"]) | PRINT_QUANTITY_HEADERS)
 
 
 def norm(v):
@@ -61,12 +72,22 @@ def inspect_file(data, filename):
                         warnings.append(
                             f"{s.title}!{c.coordinate}: formula rejected; replace with a literal value"
                         )
-                    if isinstance(value, (int, float)) and not isinstance(value, bool):
-                        warnings.append(
-                            f"{s.title}!{c.coordinate}: numeric cell; barcode leading zeros cannot be inferred"
-                        )
                     values.append(value)
                 table.append(values)
+            if table:
+                proposal = propose(table)
+                index = proposal["mapping"]["barcode"]
+                if index is not None:
+                    for number, row in enumerate(
+                        table[proposal["header"] + 1 :], proposal["header"] + 2
+                    ):
+                        value = row[index] if index < len(row) else None
+                        if isinstance(value, (int, float)) and not isinstance(
+                            value, bool
+                        ):
+                            warnings.append(
+                                f"{s.title}, row {number}: numeric barcode uses its stored value; leading zeros already lost in Excel cannot be inferred"
+                            )
             sheets[s.title] = table
         wb.close()
     elif ext == "xls":
@@ -94,13 +115,26 @@ def propose(table):
             field: next((j for j, c in enumerate(row) if norm(c) in names), None)
             for field, names in ALIASES.items()
         }
+        # A dedicated print count wins over a generic Quantity/stock column.
+        explicit = next(
+            (j for j, c in enumerate(row) if norm(c) in PRINT_QUANTITY_HEADERS), None
+        )
+        if explicit is not None:
+            mapping["quantity"] = explicit
         candidates.append((sum(v is not None for v in mapping.values()), -i, mapping))
     if not candidates:
         raise ValueError("Empty worksheet")
     _, negative, mapping = max(candidates, key=lambda c: (c[0], c[1]))
+    quantity_index = mapping["quantity"]
+    explicit_quantity = (
+        quantity_index is not None
+        and norm(table[-negative][quantity_index]) in PRINT_QUANTITY_HEADERS
+    )
     return {
         "header": -negative,
         "mapping": mapping,
+        "quantity_mode": "column" if explicit_quantity else "fixed",
+        "default_quantity": 1,
         "confirmation_required": True,
         "notice": "Confirm all mappings. Quantity may be inventory; SKU may not be a barcode. Numeric barcodes may have lost zeros.",
     }

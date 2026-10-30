@@ -62,9 +62,7 @@ function App() {
   const [header, setHeader] = useState(0);
   const [mapping, setMapping] = useState<Record<string, number | null>>({});
   const [qmode, setQmode] = useState("fixed");
-  const [fixed, setFixed] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-  const [numeric, setNumeric] = useState(false);
+  const [fixed, setFixed] = useState("1");
   const [decimal, setDecimal] = useState(".");
   const [converted, setConverted] = useState<any>();
   const [odoo, setOdoo] = useState({ url: "", database: "", key: "" });
@@ -78,10 +76,12 @@ function App() {
   const jobKey = useRef(crypto.randomUUID());
   const saves = useRef(Promise.resolve());
   const [saveState, setSaveState] = useState("Saved locally");
-  const act = async (fn: () => Promise<void>) => {
+  const act = async (fn: () => Promise<void>, preserveMessages = false) => {
     setBusy(true);
-    setError("");
-    setNotice("");
+    if (!preserveMessages) {
+      setError("");
+      setNotice("");
+    }
     try {
       await fn();
     } catch (e) {
@@ -169,7 +169,7 @@ function App() {
         urls.push(URL.createObjectURL(b));
       }
       if (!disposed) setImages(urls);
-    });
+    }, true);
     return () => {
       disposed = true;
       urls.forEach(URL.revokeObjectURL);
@@ -193,9 +193,21 @@ function App() {
     setSheet(s);
     setHeader(b.proposals[s].header);
     setMapping(b.proposals[s].mapping);
-    setConfirmed(false);
+    setQmode(b.proposals[s].quantity_mode || "fixed");
+    setFixed(String(b.proposals[s].default_quantity ?? 1));
     setConverted(undefined);
   };
+  const convertImport = () =>
+    api("import/convert", "POST", {
+      table: book.sheets[sheet],
+      header,
+      mapping,
+      quantity_mode: qmode,
+      default_quantity: Number(fixed || 1),
+      confirmed: true,
+      numeric_confirmed: true,
+      decimal_separator: decimal,
+    });
   const labels = q.products.reduce((n, p) => n + p.quantity, 0);
   const totalRows = Math.ceil(labels / 3);
   const addOdoo = async (p: any) => {
@@ -611,8 +623,8 @@ function App() {
           <section>
             <h2>Import products locally</h2>
             <p>
-              Your spreadsheet stays on this computer. Choose how inventory
-              quantities should be interpreted.
+              Choose your spreadsheet, then import and preview. Print Qty is
+              used automatically; otherwise each product gets 1 label.
             </p>
             <div className="actions">
               <input
@@ -670,14 +682,14 @@ function App() {
                     value={header + 1}
                     onChange={(e) => {
                       setHeader(Number(e.target.value) - 1);
-                      setConfirmed(false);
                       setConverted(undefined);
                     }}
                   />
                 </label>
                 <p>
                   {book.sheets[sheet].length - header - 1} data rows. All
-                  mappings require confirmation.
+                  columns are detected automatically. Adjust them only if
+                  needed.
                 </p>
                 <div className="fields">
                   {["barcode", "name", "quantity", "price", "symbol"].map(
@@ -694,7 +706,6 @@ function App() {
                                   ? null
                                   : Number(e.target.value),
                             });
-                            setConfirmed(false);
                             setConverted(undefined);
                           }}
                         >
@@ -719,8 +730,9 @@ function App() {
                 </details>
                 <div className="fields">
                   <label>
-                    Print quantity meaning
+                    Label quantities
                     <select
+                      aria-label="Label quantities"
                       value={qmode}
                       onChange={(e) => {
                         setQmode(e.target.value);
@@ -728,10 +740,10 @@ function App() {
                       }}
                     >
                       <option value="fixed">
-                        Ignore stock; apply explicit label quantity
+                        Same number of labels for every product
                       </option>
                       <option value="column">
-                        Mapped column is label-print quantity
+                        Use the selected spreadsheet quantity column
                       </option>
                     </select>
                   </label>
@@ -763,49 +775,51 @@ function App() {
                     </select>
                   </label>
                 </div>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    onChange={(e) => {
-                      setConfirmed(e.target.checked);
-                      setConverted(undefined);
-                    }}
-                  />
-                  I confirm the mappings, barcode meaning, and print quantity
-                  choice.
-                </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={numeric}
-                    onChange={(e) => {
-                      setNumeric(e.target.checked);
-                      setConverted(undefined);
-                    }}
-                  />
-                  I reviewed numeric barcode cells for lost leading zeros.
-                </label>
+                <p>
+                  {qmode === "column"
+                    ? `Label counts come from ${String(book.sheets[sheet][header]?.[mapping.quantity ?? -1] ?? "the selected quantity column")}.`
+                    : `${fixed || 1} label(s) per product. Spreadsheet stock counts are not used.`}{" "}
+                  Numeric barcodes use the value stored in Excel; leading zeros
+                  already lost in Excel cannot be recovered.
+                </p>
                 <button
-                  disabled={busy || !confirmed}
+                  className="primary"
+                  disabled={busy}
                   onClick={() =>
-                    act(async () =>
-                      setConverted(
-                        await api("import/convert", "POST", {
-                          table: book.sheets[sheet],
-                          header,
-                          mapping,
-                          quantity_mode: qmode,
-                          default_quantity: fixed ? Number(fixed) : null,
-                          confirmed,
-                          numeric_confirmed: numeric,
-                          decimal_separator: decimal,
-                        }),
-                      ),
-                    )
+                    act(async () => {
+                      const result = await convertImport();
+                      setConverted(result);
+                      if (!result.products.length)
+                        throw Error(
+                          "No products imported. Review the row errors below.",
+                        );
+                      if (
+                        q.products.length &&
+                        !confirm(
+                          `Replace the current ${q.products.length} queued products with ${result.products.length} imported products?`,
+                        )
+                      )
+                        return;
+                      const next = { ...q, products: result.products };
+                      await api("queue", "PUT", next);
+                      setQ(next);
+                      setPage(0);
+                      setTab("Print preview");
+                      setNotice(
+                        `${result.products.length} products imported. ${result.errors.length ? `${result.errors.length} rows were not imported; return to CSV / Excel import to review the row errors.` : "Ready to preview and print."}`,
+                      );
+                    })
                   }
                 >
-                  Validate and preview import
+                  Import and preview labels
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    act(async () => setConverted(await convertImport()))
+                  }
+                >
+                  Check spreadsheet rows
                 </button>
                 {converted && (
                   <>

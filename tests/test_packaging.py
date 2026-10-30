@@ -50,6 +50,9 @@ def test_packages_pin_verified_app_and_exclude_local_state(project):
     assert (project / "downloads/Barcode-Auto-Fit-Update.zip").read_bytes() == (
         project / "downloads/Barcode-Excel-Print-Update.zip"
     ).read_bytes()
+    assert (project / "downloads/Barcode-Easy-Excel-Update.zip").read_bytes() == (
+        project / "downloads/Barcode-Excel-Print-Update.zip"
+    ).read_bytes()
     assert sha256(app).hexdigest() == digest
     with zipfile.ZipFile(
         project / "downloads/Barcode-Excel-Print-Update.zip"

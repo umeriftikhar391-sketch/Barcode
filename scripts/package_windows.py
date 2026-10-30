@@ -120,6 +120,9 @@ def build(root=ROOT, ref="main"):
         (downloads / "Barcode-Auto-Fit-Update.zip").write_bytes(
             (downloads / "Barcode-Excel-Print-Update.zip").read_bytes()
         )
+        (downloads / "Barcode-Easy-Excel-Update.zip").write_bytes(
+            (downloads / "Barcode-Excel-Print-Update.zip").read_bytes()
+        )
     return digest
 
 

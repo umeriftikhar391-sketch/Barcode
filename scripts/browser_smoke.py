@@ -39,6 +39,7 @@ try:
             executable_path="/usr/bin/chromium", headless=True, args=["--no-sandbox"]
         )
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.on("dialog", lambda dialog: dialog.accept())
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         # Only loopback is allowed: no cloud/CDN dependency for this workflow.
@@ -78,16 +79,15 @@ try:
         )
         page.get_by_text("odoo.xlsx", exact=True).wait_for()
         page.get_by_label("Labels per imported product").fill("2")
-        page.get_by_label("I confirm the mappings", exact=False).check()
-        page.get_by_role("button", name="Validate and preview import").click()
-        page.get_by_role("heading", name="1 valid · 1 invalid").wait_for()
-        page.get_by_label("I reviewed numeric barcode cells", exact=False).check()
-        page.get_by_role("button", name="Validate and preview import").click()
+        page.get_by_role("button", name="Check spreadsheet rows").click()
         page.get_by_role("heading", name="2 valid · 0 invalid").wait_for()
+        page.get_by_role("button", name="Import and preview labels").click()
+        page.get_by_alt_text("Rendered physical row 2", exact=True).wait_for()
+        assert page.locator(".preview img").count() == 2
         assert not errors, errors
         browser.close()
     print(
-        "Browser smoke passed: manual entry, 7-label/3-row preview, reload persistence, supplied workbook mapping and numeric-barcode review; no external requests or page errors."
+        "Browser smoke passed: manual entry, 7-label/3-row preview, reload persistence, automatic workbook defaults and one-click import/preview; no external requests or page errors."
     )
 finally:
     restore()
