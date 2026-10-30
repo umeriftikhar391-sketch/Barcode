@@ -82,6 +82,7 @@ def update(target, archive, expected):
         try:
             for relative in folders:
                 dest, saved = target / relative, backup / relative
+                dest.parent.mkdir(parents=True, exist_ok=True)
                 saved.parent.mkdir(parents=True, exist_ok=True)
                 if dest.exists():
                     os.replace(dest, saved)
