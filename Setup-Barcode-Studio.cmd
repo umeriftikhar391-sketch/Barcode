@@ -11,8 +11,8 @@ exit /b %BARCODE_RESULT%
 # BARCODE_POWERSHELL_BEGIN
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/9b79a2711b9f6c98234eb16b3f593479cfcf9a10/downloads/Barcode-Studio.zip'
-$packageHash = '857a5a721b1e4731d9240534f008cfc46e7f83b5ff3c1160e9940e3200955ba4'
+$packageUrl = 'https://raw.githubusercontent.com/umeriftikhar391-sketch/Barcode/cb137f6a5e9a51ee699c8515dc8568b735c7b377/downloads/Barcode-Studio.zip'
+$packageHash = '6436bb9d34aee72f23fd8eede9a9e63e39edc41194a0ed977a21acb28d7f2274'
 $offlineManifestHash = ''
 $offlineMode = $env:BARCODE_SETUP_MODE -eq 'install-offline'
 $offlineRoot = Join-Path ([IO.Path]::GetDirectoryName($env:BARCODE_SETUP_FILE)) 'OfflinePayload'
