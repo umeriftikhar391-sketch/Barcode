@@ -194,6 +194,11 @@ def copy_app(source, target):
         )
     for name in ["README.md", "requirements.txt"]:
         shutil.copy2(Path(source) / name, target / name)
+    icon = Path(source) / "assets/windows/BarcodeStudio.ico"
+    if icon.is_file():
+        destination = target / "assets/windows/BarcodeStudio.ico"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(icon, destination)
     (target / "Start-Barcode.cmd").write_bytes(LAUNCHER)
 
 

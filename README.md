@@ -1,5 +1,7 @@
 # Barcode Studio
 
+**[Download Windows Setup.exe](https://github.com/umeriftikhar391-sketch/Barcode/raw/refs/heads/main/downloads/Setup.exe)** — choose an install folder; setup checks/reuses Python, downloads missing prerequisites and attempts a compatible connected TE200 driver through Windows Update. It creates an icon desktop shortcut that opens without a console. See [installer details and Windows verification limits](docs/SETUP-EXE.md).
+
 Local Windows-compatible three-column label application for TSC TE200. React/TypeScript frontend, Python/FastAPI local service. Manual products, CSV/XLSX/XLS imports, one persistent queue, exact quantities, Code 128, shared raster preview/print rendering, symbol-only currency changes, read-only Odoo JSON-2, Windows printer discovery and GDI/RAW submission modules.
 
 The confirmed roll uses a **107 mm backing**, three **33 × 24 mm stickers** and **2 mm gaps, side margins and internal margins**. Automatic fit chooses standard or narrow bars per value. Calibration checklists are optional. A value that cannot physically fit gets a visibly marked exception label with its full value and no scannable barcode, allowing the rest of the batch to continue. See the [offline automatic-fit update](docs/EXCEL-BARCODE-WIDTH.md). Software checks do not certify physical scanner readability.

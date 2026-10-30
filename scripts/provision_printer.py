@@ -677,6 +677,7 @@ def main():
             "restore",
             "export-machine",
             "install-machine",
+            "install-online",
         ],
     )
     parser.add_argument("--folder", type=Path)
@@ -686,7 +687,7 @@ def main():
     args = parser.parse_args()
     if os.name != "nt":
         raise RuntimeError("Printer provisioning requires Windows x64")
-    elevated = args.operation in ("export-machine", "install-machine")
+    elevated = args.operation in ("export-machine", "install-machine", "install-online")
     try:
         if args.operation == "initialize":
             initialize()
@@ -698,6 +699,9 @@ def main():
             export_machine(args.folder, args.printer)
         elif args.operation == "install-machine":
             install_machine(args.folder)
+        elif args.operation == "install-online":
+            from scripts.online_printer import install_updates
+            install_updates(args.folder)
         if elevated:
             report = args.folder.parent / (args.folder.name + ".result.json")
             report.write_text(json.dumps({"ok": True}), encoding="utf-8")

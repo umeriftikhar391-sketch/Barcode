@@ -32,6 +32,25 @@ def test_security(client):
     )
 
 
+def test_close_app_is_authenticated_and_waits_for_print_submissions(
+    client, monkeypatch
+):
+    closed = []
+    monkeypatch.setattr(
+        module.app.state, "stop_server", lambda: closed.append(True), raising=False
+    )
+    assert client.get("/api/session").json()["can_close"] is True
+    assert (
+        client.post("/api/exit", headers={"X-Session-Token": "wrong"}).status_code
+        == 401
+    )
+    with module.LOCK:
+        assert client.post("/api/exit").status_code == 400
+    assert not closed
+    assert client.post("/api/exit").json() == {"closed": True}
+    assert closed == [True]
+
+
 def test_queue_preview_and_print_without_checklist(client, monkeypatch):
     submitted = []
     monkeypatch.setattr(

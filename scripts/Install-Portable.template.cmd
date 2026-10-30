@@ -83,13 +83,20 @@ try {
     $shell=New-Object -ComObject WScript.Shell
     $shortcut=$shell.CreateShortcut((Join-Path $shell.SpecialFolders.Item('Desktop') 'Barcode Studio.lnk'))
     $shortcut.TargetPath=Join-Path $target 'Start-Barcode.cmd'
+    $pythonw=Join-Path $target 'Runtime\pythonw.exe'
+    if (Test-Path -LiteralPath $pythonw) {
+        $shortcut.TargetPath=$pythonw
+        $shortcut.Arguments='-B "{0}"' -f (Join-Path $target 'scripts\desktop.pyw')
+    }
     $shortcut.WorkingDirectory=$target
+    $icon=Join-Path $target 'assets\windows\BarcodeStudio.ico'
+    if (Test-Path -LiteralPath $icon) { $shortcut.IconLocation=$icon+',0' }
     $shortcut.Save()
     Write-Host 'OFFLINE SOFTWARE INSTALLATION COMPLETE' -ForegroundColor Green
-    Write-Host 'No Internet downloads or global Python installation were required. Complete the short physical print verification in the app.'
+    Write-Host 'No Internet downloads or global Python installation were required. Calibration checklists are optional.'
     if (Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue) {
-        Write-Host 'Close the old app console and open the new desktop shortcut.'
-    } else { Start-Process -FilePath (Join-Path $target 'Start-Barcode.cmd') -WorkingDirectory $target }
+        Write-Host 'Click Close app in the sidebar (or close the old console) and open the new desktop shortcut.'
+    } else { Start-Process -FilePath (Join-Path $shell.SpecialFolders.Item('Desktop') 'Barcode Studio.lnk') }
     $code=0
 } catch {
     Write-Host ('SETUP STOPPED: '+$_.Exception.Message) -ForegroundColor Red

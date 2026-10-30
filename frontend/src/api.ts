@@ -2,7 +2,9 @@ let token = "";
 export async function init() {
   const r = await fetch("/api/session");
   if (!r.ok) throw Error("Local service unavailable");
-  token = (await r.json()).token;
+  const session = await r.json();
+  token = session.token;
+  return session;
 }
 export async function api(
   path: string,

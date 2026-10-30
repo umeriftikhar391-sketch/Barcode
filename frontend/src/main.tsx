@@ -45,6 +45,7 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [canClose, setCanClose] = useState(false);
   const [report, setReport] = useState<any>();
   const [draft, setDraft] = useState(fresh());
   const [editing, setEditing] = useState(false);
@@ -92,11 +93,21 @@ function App() {
   };
   useEffect(() => {
     act(async () => {
-      await init();
+      const session = await init();
+      setCanClose(Boolean(session.can_close));
       setQ(await api("queue"));
       const p = await api("printers");
       setPrinters(p.printers);
-      setPrinter(p.selected);
+      const candidates = p.printers.filter((item: any) =>
+        /\bTE200\b/i.test(item.name),
+      );
+      setPrinter(
+        p.printers.some((item: any) => item.name === p.selected)
+          ? p.selected
+          : candidates.length === 1
+            ? candidates[0].name
+            : "",
+      );
       setJobs(await api("jobs"));
     });
   }, []);
@@ -210,6 +221,23 @@ function App() {
     });
   const labels = q.products.reduce((n, p) => n + p.quantity, 0);
   const totalRows = Math.ceil(labels / 3);
+  const submitPrint = () =>
+    act(async () => {
+      if (
+        !confirm(
+          `Submit exactly ${labels} labels in ${totalRows} rows to ${printer}? Check that the previous job was not already printed.`,
+        )
+      )
+        return;
+      const result = await api("print", "POST", {
+        id: jobKey.current,
+        queue: q,
+        printer,
+        mode,
+      });
+      setNotice([result.status, result.detail].filter(Boolean).join(": "));
+      setJobs(await api("jobs"));
+    });
   const addOdoo = async (p: any) => {
     if (!p.barcode)
       throw Error(
@@ -238,7 +266,7 @@ function App() {
     <div className="shell">
       <aside>
         <div className="brand">
-          ▥{" "}
+          <img src="/favicon.ico" width={26} height={26} alt="" />
           <span>
             Barcode Studio<small>TSC TE200 · Retail labels</small>
           </span>
@@ -262,6 +290,22 @@ function App() {
             </button>
           ))}
         </nav>
+        {canClose && (
+          <button
+            onClick={() =>
+              act(async () => {
+                await saves.current;
+                await api("exit", "POST");
+                setNotice(
+                  "Barcode Studio closed. You can close this browser tab.",
+                );
+              })
+            }
+            disabled={busy || saveState !== "Saved locally"}
+          >
+            Close app
+          </button>
+        )}
         <div className="offline">
           ● Local workspace<small>Manual entry and imports work offline</small>
         </div>
@@ -1082,9 +1126,37 @@ function App() {
               ))}
               {!labels && <p className="empty">No labels to preview</p>}
             </div>
-            <button onClick={() => setTab("Printer settings")}>
-              Review printer and print →
-            </button>
+            <div className="actions">
+              <label>
+                Print to
+                <select
+                  aria-label="Preview printer"
+                  value={printer}
+                  onChange={(e) => setPrinter(e.target.value)}
+                >
+                  <option value="">Choose printer</option>
+                  {printers.map((item) => (
+                    <option key={item.name}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="primary"
+                disabled={
+                  busy ||
+                  !printer ||
+                  !labels ||
+                  report?.geometry_errors?.length > 0 ||
+                  report?.content_errors?.length > 0
+                }
+                onClick={submitPrint}
+              >
+                Print {labels} labels
+              </button>
+              <button onClick={() => setTab("Printer settings")}>
+                Review printer and print →
+              </button>
+            </div>
           </section>
         )}
         {tab === "Printer settings" && (
@@ -1327,24 +1399,7 @@ function App() {
                   report?.geometry_errors?.length > 0 ||
                   report?.content_errors?.length > 0
                 }
-                onClick={() =>
-                  act(async () => {
-                    if (
-                      !confirm(
-                        `Submit exactly ${labels} labels in ${totalRows} rows to ${printer}? Check that the previous job was not already printed.`,
-                      )
-                    )
-                      return;
-                    const r = await api("print", "POST", {
-                      id: jobKey.current,
-                      queue: q,
-                      printer,
-                      mode,
-                    });
-                    setNotice([r.status, r.detail].filter(Boolean).join(": "));
-                    setJobs(await api("jobs"));
-                  })
-                }
+                onClick={submitPrint}
               >
                 Print {labels} labels
               </button>

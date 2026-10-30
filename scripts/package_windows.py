@@ -80,6 +80,9 @@ def build(root=ROOT, ref="main"):
     (root / "Setup-Barcode-Studio.cmd").write_bytes(contents)
     with zipfile.ZipFile(downloads / "Barcode-One-Click-Setup.zip", "w") as archive:
         add_bytes(archive, "Setup-Barcode-Studio.cmd", contents)
+    if (root / "assets/windows/SetupStub.exe").is_file():
+        from scripts.windows_sfx import build as build_setup
+        build_setup(root, contents, downloads / "Setup.exe")
     prepare = contents.replace(
         b'set "BARCODE_SETUP_MODE=install"', b'set "BARCODE_SETUP_MODE=prepare"', 1
     )

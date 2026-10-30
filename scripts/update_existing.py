@@ -22,7 +22,7 @@ def update(target, archive, expected):
     try:
         with socket.create_connection(("127.0.0.1", 8765), timeout=1):
             raise ValueError(
-                "Barcode Studio is running. Close its server/console window, then run the update again."
+                "Barcode Studio is running. Click Close app in its sidebar (or close its server console), then run the update again."
             )
     except OSError:
         pass

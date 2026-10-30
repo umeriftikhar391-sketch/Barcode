@@ -27,5 +27,12 @@ if __name__ == "__main__":
         raise SystemExit(
             "Build the frontend first: npm ci --prefix frontend && npm run build --prefix frontend"
         )
-    threading.Thread(target=open_browser, daemon=True).start()
-    uvicorn.run("backend.app:app", host="127.0.0.1", port=8765, access_log=False)
+    from backend.app import app
+
+    server = uvicorn.Server(
+        uvicorn.Config(app, host="127.0.0.1", port=8765, access_log=False)
+    )
+    app.state.stop_server = lambda: setattr(server, "should_exit", True)
+    if "--background" not in sys.argv:
+        threading.Thread(target=open_browser, daemon=True).start()
+    server.run()

@@ -3,7 +3,7 @@ from io import BytesIO
 import hashlib, json, os, secrets, sqlite3, threading
 from uuid import uuid4
 from typing import Any
-from fastapi import FastAPI, UploadFile, HTTPException, Request
+from fastapi import FastAPI, UploadFile, HTTPException, Request, BackgroundTasks
 from fastapi.responses import Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import Field
@@ -95,7 +95,26 @@ async def value_error(req, exc):
 
 @app.get("/api/session")
 def session():
-    return {"token": TOKEN, "platform": os.name}
+    return {
+        "token": TOKEN,
+        "platform": os.name,
+        "can_close": callable(getattr(app.state, "stop_server", None)),
+    }
+
+
+@app.post("/api/exit")
+def close_app(tasks: BackgroundTasks):
+    if LOCK.locked():
+        raise ValueError(
+            "A print submission is in progress. Wait for it to finish before closing the app."
+        )
+    stop = getattr(app.state, "stop_server", None)
+    if not callable(stop):
+        raise ValueError(
+            "This service was started externally. Close its server console to stop it."
+        )
+    tasks.add_task(stop)
+    return {"closed": True}
 
 
 @app.get("/api/queue")
@@ -463,6 +482,16 @@ def template(kind: str):
         raise ValueError("Unknown template")
     return FileResponse(
         ROOT / "samples" / f"products.{kind}", filename=f"products.{kind}"
+    )
+
+
+@app.get("/favicon.ico")
+def favicon():
+    icon = ROOT / "assets/windows/BarcodeStudio.ico"
+    return (
+        FileResponse(icon, media_type="image/x-icon")
+        if icon.is_file()
+        else Response(status_code=204)
     )
 
 

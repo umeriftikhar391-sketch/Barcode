@@ -10,7 +10,7 @@ exit /b %BARCODE_RESULT%
 $ErrorActionPreference='Stop'
 try {
     Write-Host 'BARCODE STUDIO - OFFLINE APPLICATION UPDATE' -ForegroundColor Cyan
-    Write-Host 'Close the Barcode Studio server/console window before continuing.'
+    Write-Host 'Click Close app in Barcode Studio (or close its server console) before continuing.'
     $root=[IO.Path]::GetDirectoryName($env:BARCODE_UPDATE_FILE)
     $archive=Join-Path $root 'Application.zip'
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne '__APP_SHA256__') { throw 'Application archive checksum mismatch. Extract the whole update ZIP.' }

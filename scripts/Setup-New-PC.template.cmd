@@ -17,6 +17,7 @@ $offlineManifestHash = ''
 $offlineMode = $env:BARCODE_SETUP_MODE -eq 'install-offline'
 $offlineRoot = Join-Path ([IO.Path]::GetDirectoryName($env:BARCODE_SETUP_FILE)) 'OfflinePayload'
 $base = Join-Path $env:LOCALAPPDATA 'BarcodeStudio'
+if ($env:BARCODE_INSTALL_ROOT) { $base = [IO.Path]::GetFullPath($env:BARCODE_INSTALL_ROOT) }
 $runtime = Join-Path $base 'Runtime\Python312'
 $appDir = Join-Path $base ('versions\' + $packageHash.Substring(0, 16))
 $log = Join-Path $base ('setup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
@@ -160,6 +161,17 @@ try {
     if (Test-Path -LiteralPath $complete) {
         if ((Get-Content -LiteralPath $complete -Raw).Trim() -ne $packageHash) { throw 'Existing installation marker does not match this package. No files were overwritten.' }
         Write-Host 'This version is already installed. Checking its dependencies...'
+        $venv = Join-Path $appDir '.venv\Scripts\python.exe'
+        if (-not (Test-Path -LiteralPath $venv)) {
+            & $python -m venv (Join-Path $appDir '.venv')
+            if ($LASTEXITCODE -ne 0) { throw 'Could not repair the private Python environment.' }
+        }
+        if ($offlineMode) {
+            & $venv -m pip install --no-index --find-links (Join-Path $offlineRoot 'wheelhouse') --require-hashes --only-binary=:all: --no-cache-dir --disable-pip-version-check -r (Join-Path $offlineRoot 'requirements-offline.txt')
+        } else {
+            & $venv -m pip install --disable-pip-version-check -r (Join-Path $appDir 'requirements.txt')
+        }
+        if ($LASTEXITCODE -ne 0) { throw 'Could not repair missing application packages.' }
     } else {
         if (-not (Test-Path -LiteralPath $appDir)) {
             $archive = Join-Path $work 'Barcode-Studio.zip'
@@ -191,9 +203,19 @@ try {
 
     $venv = Join-Path $appDir '.venv\Scripts\python.exe'
     & $venv -m pip check
-    if ($LASTEXITCODE -ne 0) { throw 'Dependency consistency check failed.' }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'Repairing missing or inconsistent application packages...'
+        if ($offlineMode) {
+            & $venv -m pip install --no-index --find-links (Join-Path $offlineRoot 'wheelhouse') --require-hashes --only-binary=:all: --no-cache-dir --disable-pip-version-check -r (Join-Path $offlineRoot 'requirements-offline.txt')
+        } else {
+            & $venv -m pip install --disable-pip-version-check -r (Join-Path $appDir 'requirements.txt')
+        }
+        if ($LASTEXITCODE -ne 0) { throw 'Dependency repair failed.' }
+        & $venv -m pip check
+        if ($LASTEXITCODE -ne 0) { throw 'Dependency consistency check failed after repair.' }
+    }
     & $venv -c "import fastapi,uvicorn,openpyxl,xlrd,barcode,PIL,fontTools,httpx,keyring,win32print,win32ui"
-    if ($LASTEXITCODE -ne 0) { throw 'An application dependency could not load. Setup is not complete.' }
+    if ($LASTEXITCODE -ne 0) { throw 'An application dependency could not load. Setup is not complete. Rerun setup to repair the installation.' }
     Push-Location -LiteralPath $appDir
     try {
         & $venv -c "from backend.models import Product,Geometry; from backend.render import label; p=Product(name='Coaster',barcode='1000111',price='1200',symbol='Rs.',quantity=1); assert label(p,Geometry()).size[0]>0; print('Barcode renderer check passed.')"
@@ -204,8 +226,15 @@ try {
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut((Join-Path $shell.SpecialFolders.Item('Desktop') 'Barcode Studio.lnk'))
     $shortcut.TargetPath = Join-Path $appDir 'Start-Barcode.cmd'
+    $pythonw = Join-Path $appDir '.venv\Scripts\pythonw.exe'
+    if ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath (Join-Path $appDir 'scripts\desktop.pyw'))) {
+        $shortcut.TargetPath = $pythonw
+        $shortcut.Arguments = '-B "{0}"' -f (Join-Path $appDir 'scripts\desktop.pyw')
+    }
     $shortcut.WorkingDirectory = $appDir
     $shortcut.Description = 'Open Barcode Studio local label workspace'
+    $appIcon = Join-Path $appDir 'assets\windows\BarcodeStudio.ico'
+    if (Test-Path -LiteralPath $appIcon) { $shortcut.IconLocation = $appIcon + ',0' }
     $shortcut.Save()
     $bundle = Join-Path ([IO.Path]::GetDirectoryName($env:BARCODE_SETUP_FILE)) 'PrinterBundle'
     if ($env:BARCODE_SETUP_MODE -in @('prepare','prepare-offline')) {
@@ -225,7 +254,7 @@ try {
         Write-Host 'FULL NEW-PC SETUP CREATED' -ForegroundColor Green
         Write-Host ('Copy this single ZIP to each new Windows x64 PC: ' + $output)
         Write-Host 'Extract it, connect/power on the TE200, and double-click Setup-Barcode-Studio.cmd. Keep PrinterBundle beside that CMD.'
-        Write-Host 'The ZIP contains the signed driver and tested media settings. Physical calibration confirmation must be completed on each PC.'
+        Write-Host 'The ZIP contains the signed driver and tested media settings. Inspect physical output on each PC; calibration checklists are optional.'
         if ($env:BARCODE_SETUP_MODE -eq 'prepare-offline') { Write-Host 'OFFLINE BUNDLE: Python installer, all dependency wheels and the application are included. Keep OfflinePayload beside the CMD; no Internet is needed on the destination PC.' -ForegroundColor Green }
         Start-Process explorer.exe -ArgumentList ('/select,"{0}"' -f $output)
     } else {
@@ -234,24 +263,28 @@ try {
             if (Test-Path -LiteralPath $bundle) {
                 Write-Host 'Installing the captured signed driver and restoring the tested media settings. Keep the TE200 powered on and connected by USB.'
                 & $venv -m scripts.provision_printer restore --folder $bundle
-                if ($LASTEXITCODE -ne 0) { throw 'App installed, but printer setup is incomplete. Read the specific error above, resolve it and rerun this setup. Production remains locked.' }
+                if ($LASTEXITCODE -ne 0) { throw 'App installed, but printer setup is incomplete. Read the specific error above, resolve it and rerun this setup. Printer setup still needs attention.' }
             } else {
-                & $venv -m scripts.provision_printer initialize
+                if ($env:BARCODE_DOWNLOAD_PRINTER -eq '1') {
+                    & $venv -m scripts.online_printer
+                } else {
+                    & $venv -m scripts.provision_printer initialize
+                }
                 if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the confirmed roll geometry.' }
-                Write-Host 'This download has no captured PrinterBundle. For automatic driver/profile setup, create the full ZIP on your working PC using Prepare-Full-PC-Setup.cmd.' -ForegroundColor Yellow
+                if ($env:BARCODE_DOWNLOAD_PRINTER -ne '1') { Write-Host 'This download has no captured PrinterBundle. For automatic driver/profile setup, create the full ZIP on your working PC using Prepare-Full-PC-Setup.cmd.' -ForegroundColor Yellow }
             }
         } finally { Pop-Location }
         Write-Host ''
         Write-Host 'SOFTWARE INSTALLATION COMPLETE' -ForegroundColor Green
-        Write-Host 'Use the Barcode Studio desktop shortcut next time. Keep its console window open while using it.'
+        Write-Host 'Use the Barcode Studio desktop shortcut next time. The app runs without a console window.'
         Write-Host 'Confirmed roll: 107 mm, three 33 x 24 mm stickers, 2 mm gaps/margins, 2 mm internal safe margins.'
-        Write-Host 'A short physical verification is required on this PC before production printing unlocks. Odoo credentials are not transferred.'
+        Write-Host 'Calibration checklists are optional. Odoo credentials are not transferred.'
         Write-Host ('Application folder: ' + $appDir)
         $listener = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue
         if ($listener) {
-            Write-Host 'An app is already using port 8765. Close the old Barcode Studio console, then open the new desktop shortcut.' -ForegroundColor Yellow
-        } else {
-            Start-Process -FilePath (Join-Path $appDir 'Start-Barcode.cmd') -WorkingDirectory $appDir
+            Write-Host 'An app is already using port 8765. Click Close app in the sidebar (or close the old console), then open the new desktop shortcut.' -ForegroundColor Yellow
+        } elseif ($env:BARCODE_NO_LAUNCH -ne '1') {
+            Start-Process -FilePath (Join-Path $shell.SpecialFolders.Item('Desktop') 'Barcode Studio.lnk')
         }
     }
     $resultCode = 0
